@@ -22,6 +22,15 @@
     let preferredUnit = (initialState && ['kt','ms','kmh'].includes(initialState.u)) ? initialState.u : 'kt'; // 'kt' | 'ms' | 'kmh'
     const KT_TO_MS = 0.514444, KT_TO_KMH = 1.852;
     const tz = 'Asia/Taipei';
+    const THEME_STORAGE_KEY = 'cyclone-theme';
+    let currentTheme = 'color';
+    try{
+      const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      if(storedTheme === 'mono'){
+        currentTheme = 'mono';
+        document.body.classList.add('theme-mono');
+      }
+    }catch{}
 
     // 配色
     const C_GRAY   = '#8E8E8E';
@@ -56,6 +65,7 @@
     const wsOut=document.getElementById('wsOut');
 
     const unitToggle=document.getElementById('unitToggle');
+    const themeToggle=document.getElementById('themeToggle');
     const btnShare=document.getElementById('btnShare');
     const btnShareTop=document.getElementById('btnShareTop');
     const btnOpenWL=document.getElementById('btnOpenWL');
@@ -120,6 +130,8 @@
       if(detailTitle) detailTitle.textContent='點選節點以檢視詳細資料';
       if(detailSubtitle) detailSubtitle.textContent='同時支援決定性與系集成員。';
       [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailWindPrimary, detailCurrentTime, detailCurrentWind, detailPrevTime, detailPrevWind, detailNextTime, detailNextWind, detailKtClass, detailMsClass, detailPressure, detailTrend].forEach(el=>{ if(el) el.textContent='—'; });
+      if(detailSystem) detailSystem.classList.remove('muted');
+      if(detailMember) detailMember.classList.add('muted');
       if(detailPrevBtn) detailPrevBtn.disabled=true;
       if(detailNextBtn) detailNextBtn.disabled=true;
       if(detailPrevCard) detailPrevCard.classList.add('inactive');
@@ -146,8 +158,15 @@
 
       if(detailTitle) detailTitle.textContent = info.title || '節點資訊';
       if(detailSubtitle) detailSubtitle.textContent = info.subtitle || '';
-      if(detailSystem) detailSystem.textContent = info.system || '—';
-      if(detailMember) detailMember.textContent = info.member || '—';
+      if(detailSystem){
+        detailSystem.textContent = info.system || '—';
+        detailSystem.classList.toggle('muted', !info.system || info.system==='—');
+      }
+      if(detailMember){
+        detailMember.textContent = info.member || '—';
+        const highlight = !!(info.member && info.member!=='—');
+        detailMember.classList.toggle('muted', !highlight);
+      }
       if(detailTimeTw) detailTimeTw.textContent = info.timeTw || '—';
       if(detailTimeUtc) detailTimeUtc.textContent = info.timeUtc || '—';
       if(detailLocation) detailLocation.textContent = info.location || '—';
@@ -203,6 +222,35 @@
       historyLogEl.textContent += `[${t}] ${msg}\n`;
       historyLogEl.scrollTop = historyLogEl.scrollHeight;
     }
+
+    const collapsiblePanels = document.querySelectorAll('#sidebar .panel');
+    collapsiblePanels.forEach(panel=>{
+      const header = panel.querySelector('header');
+      const body = panel.querySelector('.panel-body');
+      if(!header || !body) return;
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'panel-toggle';
+      toggleBtn.setAttribute('aria-label', '收合面板');
+      header.appendChild(toggleBtn);
+      if(panel.dataset.defaultCollapsed === 'true'){ panel.classList.add('collapsed'); }
+      const titleText = (header.querySelector('.panel-title')?.textContent || '').trim();
+      const syncState = ()=>{
+        const collapsed = panel.classList.contains('collapsed');
+        toggleBtn.textContent = collapsed ? '＋' : '−';
+        toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        toggleBtn.title = collapsed ? '展開' : '收合';
+      };
+      syncState();
+      toggleBtn.addEventListener('click', ()=>{
+        panel.classList.toggle('collapsed');
+        syncState();
+        if(titleText){
+          const nowCollapsed = panel.classList.contains('collapsed');
+          logOp(`面板${nowCollapsed?'收合':'展開'}：${titleText}`);
+        }
+      });
+    });
 
     // App state
     const systemLayers=new Map(); // key -> {group, det:[], ens:[], color, visible:true, label}
@@ -887,7 +935,7 @@
         m.get(sKey).push(r);
       });
 
-      const bounds=L.latLngBounds(); let has=false;
+      const bounds=L.latLngBounds(); let has=false; let firstKey=null;
       bySys.forEach((samples, key)=>{
         const [source, track] = key.split(' | ');
         const color=hashColor(key);
@@ -911,8 +959,10 @@
           }
         }
         addSystemControl(key, color, `${track} | ${source}`);
+        if(!firstKey) firstKey=key;
       });
 
+      if(firstKey){ setActiveSystem(firstKey); }
       refreshVisibility();
       if(has && bounds.isValid()){ map.fitBounds(bounds.pad(0.2)); } else { map.setView([18,130], 3); }
 
@@ -1004,6 +1054,12 @@
       const kts    = rows.map(r=> r.kt);
       const values = rows.map(r=> unitValueFromKt(r.kt));
 
+      const computedStyle = getComputedStyle(document.body);
+      const axisColor = (computedStyle.getPropertyValue('--heading') || '#cfe3ff').trim() || '#cfe3ff';
+      const gridColor = (computedStyle.getPropertyValue('--border') || '#223').trim() || '#223';
+      const legendColor = (computedStyle.getPropertyValue('--muted') || '#9aa7c0').trim() || '#9aa7c0';
+      const tooltipBg = (computedStyle.getPropertyValue('--panel-solid') || 'rgba(12,20,38,0.92)').trim() || 'rgba(12,20,38,0.92)';
+
       const safeIdx = (i)=> Math.max(0, Math.min(i ?? 0, kts.length-1));
       const ptColor = (ctx)=> colorDynamic(kts[safeIdx(ctx.dataIndex)]);
 
@@ -1013,7 +1069,7 @@
           label: (mode==='det'?'決定性':'系集（N）'),
           data: values,
           fill: false,
-          borderColor: '#9aa7c0', // 線固定色（需求）
+          borderColor: legendColor || '#9aa7c0',
           borderWidth: 2,
           pointRadius: 3.5,
           pointHoverRadius: 5,
@@ -1029,13 +1085,18 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { intersect:false, mode:'nearest' },
           scales: {
-            x: { ticks:{ color:'#cfe3ff' }, grid:{ color:'#223' }},
-            y: { ticks:{ color:'#cfe3ff' }, grid:{ color:'#223' }, title:{ display:true, text: unitLabel(), color:'#cfe3ff'} }
+            x: { ticks:{ color: axisColor }, grid:{ color: gridColor }},
+            y: { ticks:{ color: axisColor }, grid:{ color: gridColor }, title:{ display:true, text: unitLabel(), color: axisColor } }
           },
           plugins: {
-            legend: { labels: { color:'#cfe3ff' } },
+            legend: { labels: { color: axisColor } },
             tooltip: {
+              backgroundColor: tooltipBg,
+              titleColor: axisColor,
+              bodyColor: axisColor,
+              displayColors: false,
               callbacks: {
                 label: (ctx)=>{
                   const i = safeIdx(ctx.dataIndex);
@@ -1063,6 +1124,29 @@
     }
 
     // ====== 分享（狀態） ======
+    function applyTheme(theme, {persist=true}={}){
+      currentTheme = (theme==='mono') ? 'mono' : 'color';
+      document.body.classList.toggle('theme-mono', currentTheme==='mono');
+      if(themeToggle){
+        themeToggle.textContent = currentTheme==='mono' ? '🌈 彩色版面' : '🌗 黑白版面';
+        themeToggle.setAttribute('aria-pressed', currentTheme==='mono' ? 'true' : 'false');
+      }
+      if(persist){
+        try{ localStorage.setItem(THEME_STORAGE_KEY, currentTheme); }catch{}
+      }
+      buildTsChart();
+    }
+
+    applyTheme(currentTheme, {persist:false});
+
+    if(themeToggle){
+      themeToggle.addEventListener('click', ()=>{
+        const next = currentTheme==='mono' ? 'color' : 'mono';
+        applyTheme(next);
+        logOp(`版面主題切換：${next==='mono'?'黑白':'彩色'}`);
+      });
+    }
+
     function serializeState(){
       const c = map.getCenter(), z = map.getZoom();
       const sysVis = {}; systemLayers.forEach((e,k)=>{ sysVis[k]=!!e.visible; });
