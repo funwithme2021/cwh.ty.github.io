@@ -184,6 +184,7 @@
     const tz = 'Asia/Taipei';
 
     // 配色
+    const C_GRAY   = '#8E8E8E';
     const C_BLUE   = '#1e88e5';
     const C_TEAL   = '#00d2a8';
     const C_YELLOW = '#ffd166';
@@ -288,8 +289,8 @@
     // ====== Color & Classification ======
     function colorByKT6(kt){
       if(kt==null || !isFinite(kt)) return C_BLUE;
-      if(kt<34) return C_BLUE;
-      if(kt<=63) return C_BLUE;     // 熱帶風暴
+      if(kt<33.4) return C_GRAY;      // 熱帶擾動
+      if(kt<=62) return C_BLUE;     // 熱帶風暴
       if(kt<=82) return C_TEAL;     // 一級
       if(kt<=95) return C_YELLOW;   // 二級
       if(kt<=113) return C_ORANGE;  // 三級
@@ -298,8 +299,9 @@
     }
     function colorByKMH8_fromKT(kt){
       if(kt==null || !isFinite(kt)) return C_BLUE;
-      if(kt<34)  return C_BLUE;    // <63
-      if(kt<64)  return C_TEAL;    // 63–117
+      if(kt<22)  return C_GRAY;    // <40.7
+      if(kt<33.4)  return C_BLUE;    // 41-56
+      if(kt<64)  return C_TEAL;    // 56–117
       if(kt<83)  return C_YELLOW;  // 118–152
       if(kt<96)  return C_ORANGE;  // 153–176
       if(kt<111) return C_DEEPOR;  // 178–209
@@ -309,15 +311,17 @@
     }
     function colorByMS4(ms){
       if(ms==null || !isFinite(ms)) return C_BLUE;
-      if(ms<=17.1) return C_BLUE;      // 熱帶性低氣壓
-      if(ms<=32.6) return C_TEAL;      // 輕度
-      if(ms<=50.9) return C_ORANGE;    // 中度（黃橘）
+      if(ms<=11.32) return C_GRAY;      // 熱帶擾動
+      if(ms<=17.19) return C_BLUE;      // 熱帶性低氣壓
+      if(ms<=32.69) return C_TEAL;      // 輕度
+      if(ms<=50.99) return C_ORANGE;    // 中度（黃橘）
       return C_RED;                    // 強烈
     }
     function classifyKT(kt){
       if(kt==null || !isFinite(kt)) return '—';
-      if(kt<34) return '擾動/熱帶性低氣壓（<34 kt）';
-      if(kt<=63) return '熱帶風暴（34–63 kt）';
+      if(kt<22) return '熱帶擾動/低壓（<22 kt）';
+      if(kt<=33.4) return '熱帶性低氣壓（22-33.4 kt）';
+      if(kt<=63) return '熱帶風暴（35–63 kt）';
       if(kt<=82) return '一級颱風（64–82 kt）';
       if(kt<=95) return '二級颱風（83–95 kt）';
       if(kt<=113) return '三級颱風（96–113 kt）';
@@ -326,9 +330,10 @@
     }
     function classifyMS(ms){
       if(ms==null || !isFinite(ms)) return '—';
-      if(ms<=17.1) return '熱帶性低氣壓（≤17.1 m/s）';
-      if(ms<=32.6) return '輕度颱風（17.2–32.6 m/s）';
-      if(ms<=50.9) return '中度颱風（32.7–50.9 m/s）';
+      if(ms<=11.319) return '熱帶擾動/低壓（≤11.32 m/s）';
+      if(ms<=17.19) return '熱帶性低氣壓（11.33-17.1 m/s）';
+      if(ms<=32.69) return '輕度颱風（17.2–32.6 m/s）';
+      if(ms<=50.99) return '中度颱風（32.7–50.9 m/s）';
       return '強烈颱風（≥51 m/s）';
     }
     function colorDynamic(kt){
@@ -354,15 +359,17 @@
       document.getElementById('unitToggle').textContent = '單位：' + preferredUnit;
       const el = document.getElementById('legendText');
       if(preferredUnit==='ms'){
-        el.innerHTML = `強度（<b>m/s</b> 四級）：
+        el.innerHTML = `強度（<b>m/s</b> ）：
+          <span class="item"><span class="dot" style="background:${C_GRAY}"></span>熱帶擾動/低壓</span>
           <span class="item"><span class="dot" style="background:${C_BLUE}"></span>熱帶性低氣壓</span>
           <span class="item"><span class="dot" style="background:${C_TEAL}"></span>輕度颱風</span>
           <span class="item"><span class="dot" style="background:${C_ORANGE}"></span>中度颱風</span>
           <span class="item"><span class="dot" style="background:${C_RED}"></span>強烈颱風</span>`;
       } else if(preferredUnit==='kmh'){
-        el.innerHTML = `強度（<b>km/h</b> 八級）：
-          <span class="item"><span class="dot" style="background:${C_BLUE}"></span>&lt;63</span>
-          <span class="item"><span class="dot" style="background:${C_TEAL}"></span>63–117</span>
+        el.innerHTML = `強度（<b>km/h</b> ）：
+          <span class="item"><span class="dot" style="background:${C_GRAY}"></span>&lt;41</span>
+          <span class="item"><span class="dot" style="background:${C_BLUE}"></span>&lt;41-55</span>
+          <span class="item"><span class="dot" style="background:${C_TEAL}"></span>56–117</span>
           <span class="item"><span class="dot" style="background:${C_YELLOW}"></span>118–152</span>
           <span class="item"><span class="dot" style="background:${C_ORANGE}"></span>153–176</span>
           <span class="item"><span class="dot" style="background:${C_DEEPOR}"></span>178–209</span>
@@ -370,7 +377,8 @@
           <span class="item"><span class="dot" style="background:#d50000"></span>248–289</span>
           <span class="item"><span class="dot" style="background:${C_PURPLE}"></span>≥291</span>`;
       } else {
-        el.innerHTML = `強度（<b>kt</b> 六級）：
+        el.innerHTML = `強度（<b>kt</b> ）：
+          <span class="item"><span class="dot" style="background:${C_GRAY}"></span>熱帶性低氣壓/擾動</span>
           <span class="item"><span class="dot" style="background:${C_BLUE}"></span>熱帶風暴</span>
           <span class="item"><span class="dot" style="background:${C_TEAL}"></span>一級</span>
           <span class="item"><span class="dot" style="background:${C_YELLOW}"></span>二級</span>
@@ -488,12 +496,12 @@
         const ktClass = (kt!=null) ? classifyKT(kt) : '—';
         const msClass = (ms!=null) ? classifyMS(ms) : '—';
         m.bindPopup(`<b>${label}</b> | sample: <b>${sample}</b><br>
-          時間（台灣）：${twt}<br>時間（UTC）：${utc}<br>
-          位置：${(+p.lat).toFixed(2)}, ${(+p.lon).toFixed(2)}<br>
-          風速：${bestLine}<br>
-          分級（kt）：${ktClass}<br>
-          分級（m/s）：${msClass}<br>
-          中心氣壓：${pres}`);
+          -時間（台灣）：${twt}<br>-時間（UTC）：${utc}<br>
+          -位置：${(+p.lat).toFixed(2)}, ${(+p.lon).toFixed(2)}<br>
+          -風速：${bestLine}<br>
+          -分級（kt）：${ktClass}<br>
+          -分級（m/s）：${msClass}<br>
+          -中心氣壓：${pres}`);
         markers.push(m);
       });
 
