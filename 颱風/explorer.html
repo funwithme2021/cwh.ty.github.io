@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>全球熱帶氣旋探索台｜即時互動地圖</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js"></script>
+</head>
+<body class="explorer-page">
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Cyclone Studio</a>
+      <nav class="site-nav">
+        <a href="index.html">首頁</a>
+        <a href="explorer.html" class="active">即時探索</a>
+        <a href="guide.html">使用指南</a>
+      </nav>
+      <div class="header-actions">
+        <a class="ghost-link" href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener">WeatherLab 官方</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="explorer-main">
+    <section class="intro">
+      <div>
+        <h1>全球熱帶氣旋探索台</h1>
+        <p>即時整合 DeepMind WeatherLab 以及自備 CSV，使用互動式地圖掌握熱帶氣旋的路徑、強度與風圈，並透過時間 × 強度視覺化與歷史紀錄讓決策更直覺。</p>
+      </div>
+      <div class="intro-actions">
+        <button class="btn" id="btnCollapse">隱藏資料面板</button>
+        <button class="btn outline" id="btnShareTop">分享目前視圖</button>
+      </div>
+    </section>
+
+    <div id="app" class="app-grid">
+      <aside id="sidebar">
+        <div class="panel-group">
+          <section class="panel">
+            <header>
+              <div class="panel-title">線上資料</div>
+              <p class="panel-sub">DeepMind WeatherLab</p>
+            </header>
+            <div class="panel-body">
+              <div class="field-grid">
+                <label for="dmModel">模型</label>
+                <select id="dmModel">
+                  <option value="FNV3" selected>FNV3</option>
+                  <option value="GENC">GENC</option>
+                  <option value="GRPH">GRPH</option>
+                </select>
+                <label for="dmCycle">循環</label>
+                <select id="dmCycle"></select>
+              </div>
+              <div class="button-row">
+                <button class="btn sm" id="btnLoadCycle">載入所選循環</button>
+                <button class="btn sm" id="btnLatest">最新可用</button>
+                <button class="btn sm ghost" id="btnOpenWL" title="開啟 WeatherLab 官方網站">WeatherLab</button>
+              </div>
+              <p class="note">近 48 小時共有 8 個 UTC 循環（00/06/12/18）。若最新未完全發布，可改選較早循環。⚠️ 若遭 CORS 擋下，請改用下方「匯入 CSV」。</p>
+              <div class="status" id="dmStatus" hidden></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">匯入資料</div>
+              <p class="panel-sub">支援多個 CSV</p>
+            </header>
+            <div class="panel-body">
+              <label class="upload" id="fileLabel">
+                <input type="file" id="csvFiles" accept=".csv" multiple/>
+                <span>📄 點我匯入多個 CSV</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">視圖模式</div>
+              <p class="panel-sub">選擇路線或機率熱度</p>
+            </header>
+            <div class="panel-body">
+              <div class="chip-row">
+                <span class="chip" id="modeTracks" data-active="true">路線圖</span>
+                <span class="chip" id="modeProb">機率圖</span>
+              </div>
+              <p class="note">機率圖會以<b>所有可見系統</b>的<b>系集成員點位</b>建立熱度圖。</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">決定性顏色</div>
+            </header>
+            <div class="panel-body">
+              <div class="chip-row">
+                <span class="chip" id="detBlack" data-active="true">黑線</span>
+                <span class="chip" id="detIntensity">強度上色</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">顯示選項</div>
+            </header>
+            <div class="panel-body">
+              <div class="toggle-grid">
+                <label class="toggle"><input type="checkbox" id="toggleDet" checked><span>決定性</span></label>
+                <label class="toggle"><input type="checkbox" id="toggleEns" checked><span>系集</span></label>
+                <label class="toggle"><input type="checkbox" id="togglePts" checked><span>節點</span></label>
+                <label class="toggle"><input type="checkbox" id="toggleRadii" checked><span>風圈（僅決定性）</span></label>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">風速換算</div>
+            </header>
+            <div class="panel-body">
+              <div class="field-grid compact">
+                <input type="number" id="wsValue" placeholder="數值" step="0.01"/>
+                <select id="wsUnit">
+                  <option value="kt">節 (kt)</option>
+                  <option value="ms">公尺/秒 (m/s)</option>
+                  <option value="kmh">公里/時 (km/h)</option>
+                </select>
+                <button class="btn sm" id="wsCalc">換算</button>
+              </div>
+              <div class="status muted" id="wsOut"><span class="muted">結果：</span>—</div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">系統清單</div>
+              <p class="panel-sub">track_id | 檔名</p>
+            </header>
+            <div class="panel-body">
+              <input class="search" id="systemFilter" type="search" placeholder="搜尋系統或檔案"/>
+              <div class="status muted" id="systemSummary">尚無資料</div>
+              <div id="systems" class="sys-list"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">時間 × 強度圖</div>
+            </header>
+            <div class="panel-body">
+              <div class="chip-row dense">
+                <select id="tsSystemSel"></select>
+                <span class="chip" id="tsModeDet" data-active="true">決定性</span>
+                <span class="chip" id="tsModeEns">所有系集</span>
+              </div>
+              <div id="tsWrap"><canvas id="tsChart"></canvas></div>
+              <p class="note">滑鼠移入圖表，可檢視節點詳細資訊與分級。</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">歷史操作與診斷</div>
+            </header>
+            <div class="panel-body">
+              <div id="historyLog" class="history"></div>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <section class="map-area">
+        <div class="map-container">
+          <div id="map"></div>
+          <div class="legend" id="legend">
+            <div class="bar" id="legendText"></div>
+            <div class="tools">
+              <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
+              <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
+            </div>
+          </div>
+          <aside class="detail-drawer" id="detailPanel">
+            <div class="drawer-header">
+              <div>
+                <h3 id="detailTitle">點選節點以檢視詳細資料</h3>
+                <p id="detailSubtitle">同時支援決定性與系集成員。</p>
+              </div>
+              <button class="icon-btn" id="detailClose" aria-label="關閉詳細資訊">×</button>
+            </div>
+            <div class="drawer-body">
+              <dl>
+                <div><dt>系統</dt><dd id="detailSystem">—</dd></div>
+                <div><dt>成員</dt><dd id="detailMember">—</dd></div>
+                <div><dt>時間（台灣）</dt><dd id="detailTimeTw">—</dd></div>
+                <div><dt>時間（UTC）</dt><dd id="detailTimeUtc">—</dd></div>
+                <div><dt>位置</dt><dd id="detailLocation">—</dd></div>
+                <div><dt>風速</dt><dd id="detailWind">—</dd></div>
+                <div><dt>分級（kt）</dt><dd id="detailKtClass">—</dd></div>
+                <div><dt>分級（m/s）</dt><dd id="detailMsClass">—</dd></div>
+                <div><dt>中心氣壓</dt><dd id="detailPressure">—</dd></div>
+              </dl>
+              <div class="drawer-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="toast" id="toast">已複製連結！</div>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div>
+        <strong>Cyclone Studio</strong>
+        <p>資料僅供研究與教學參考，實際操作請參考各國官方氣象單位。</p>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">首頁</a>
+        <a href="explorer.html">即時探索</a>
+        <a href="guide.html">使用指南</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
