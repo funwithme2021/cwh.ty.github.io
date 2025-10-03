@@ -10,24 +10,26 @@
   --text: #f2f5ff;
   --muted: #8f9bbf;
   --heading: #dbe5ff;
+  --header-bg: rgba(6, 10, 20, 0.82);
   --radius-lg: 22px;
   --radius-md: 16px;
   --radius-sm: 12px;
   --sidebar-w: 440px;
 }
 
-body.theme-mono {
-  --bg: radial-gradient(circle at top, #101010 0%, #080808 55%, #000 100%);
-  --panel: rgba(18, 18, 18, 0.86);
-  --panel-solid: #0f0f0f;
-  --border: rgba(200, 200, 200, 0.22);
-  --border-strong: rgba(200, 200, 200, 0.42);
-  --accent: #f5f5f5;
-  --accent-strong: #f0f0f0;
-  --accent-soft: rgba(255, 255, 255, 0.12);
-  --text: #f6f6f6;
-  --muted: #b0b0b0;
-  --heading: #ffffff;
+body.theme-day {
+  --bg: radial-gradient(circle at top, #f1f4ff 0%, #e2e8ff 50%, #d7dfff 100%);
+  --panel: rgba(248, 250, 255, 0.92);
+  --panel-solid: rgba(247, 249, 255, 0.95);
+  --border: rgba(70, 105, 210, 0.16);
+  --border-strong: rgba(70, 105, 210, 0.32);
+  --accent: #3c63ff;
+  --accent-strong: #2d58ff;
+  --accent-soft: rgba(60, 99, 255, 0.12);
+  --text: #1b2544;
+  --muted: #4f5f85;
+  --heading: #0f1d3a;
+  --header-bg: rgba(255, 255, 255, 0.92);
 }
 
 * {
@@ -84,7 +86,7 @@ kbd {
   top: 0;
   z-index: 800;
   backdrop-filter: blur(16px);
-  background: rgba(6, 10, 20, 0.82);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border);
   padding: 16px 0;
 }
@@ -131,12 +133,30 @@ kbd {
   background: linear-gradient(90deg, #7aa3ff, #a7b9ff);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-actions .btn {
+  box-shadow: none;
+}
+
+.header-actions .btn:hover {
+  transform: none;
+}
+
 .header-actions .ghost-link {
   font-size: 13px;
   padding: 8px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: rgba(122, 163, 255, 0.08);
+}
+
+body.theme-day .header-actions .ghost-link {
+  background: rgba(60, 99, 255, 0.1);
 }
 
 .explorer-main {
@@ -223,6 +243,15 @@ kbd {
 
 .btn.ghost:hover {
   background: rgba(122, 163, 255, 0.28);
+}
+
+body.theme-day .btn.ghost {
+  background: rgba(60, 99, 255, 0.16);
+  color: var(--heading);
+}
+
+body.theme-day .btn.ghost:hover {
+  background: rgba(60, 99, 255, 0.24);
 }
 
 .btn.sm {
@@ -410,6 +439,14 @@ kbd {
   outline: none;
 }
 
+body.theme-day .field-grid input,
+body.theme-day .field-grid select,
+body.theme-day .search {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(80, 110, 210, 0.32);
+  color: var(--text);
+}
+
 .field-grid input:focus,
 .field-grid select:focus,
 .search:focus {
@@ -447,6 +484,17 @@ kbd {
 .upload:hover {
   background: rgba(17, 32, 68, 0.75);
   border-color: rgba(126, 146, 255, 0.6);
+}
+
+body.theme-day .upload {
+  background: rgba(235, 240, 255, 0.92);
+  border-color: rgba(80, 110, 210, 0.35);
+  color: var(--heading);
+}
+
+body.theme-day .upload:hover {
+  background: rgba(224, 232, 255, 0.96);
+  border-color: rgba(80, 110, 210, 0.5);
 }
 
 .chip-row {
@@ -497,6 +545,11 @@ kbd {
   border: 1px solid rgba(126, 146, 255, 0.16);
 }
 
+body.theme-day .toggle {
+  background: rgba(230, 236, 255, 0.92);
+  border-color: rgba(80, 110, 210, 0.28);
+}
+
 .toggle input {
   width: 16px;
   height: 16px;
@@ -521,6 +574,10 @@ kbd {
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+body.theme-day .sys-row {
+  background: rgba(232, 238, 255, 0.9);
 }
 
 .sys-row:hover {
@@ -560,6 +617,12 @@ kbd {
   border-radius: var(--radius-sm);
   padding: 12px;
   white-space: pre-wrap;
+}
+
+body.theme-day .history {
+  background: rgba(240, 244, 255, 0.92);
+  border-color: rgba(80, 110, 210, 0.28);
+  color: #2b3b68;
 }
 
 .workspace {
@@ -604,9 +667,13 @@ kbd {
   border-radius: calc(var(--radius-lg) - 6px);
   border: 1px solid rgba(126, 146, 255, 0.18);
   overflow: hidden;
-  min-height: clamp(520px, 60vh, 780px);
+  min-height: clamp(600px, 68vh, 860px);
   flex: 1 1 auto;
   min-width: 0;
+}
+
+body.theme-day .map-frame {
+  border-color: rgba(80, 112, 210, 0.28);
 }
 
 #map {
@@ -633,6 +700,11 @@ kbd {
   align-items: stretch;
   gap: 12px;
   max-width: min(520px, 76vw);
+  box-shadow: 0 18px 38px rgba(6, 12, 28, 0.35);
+}
+
+body.theme-day .legend {
+  box-shadow: 0 16px 32px rgba(40, 72, 150, 0.18);
 }
 
 .legend-scale {
@@ -860,6 +932,7 @@ kbd {
   font-size: 22px;
   font-weight: 700;
   color: var(--heading);
+  transition: color 0.25s ease, text-shadow 0.25s ease;
 }
 
 .metric-sub {

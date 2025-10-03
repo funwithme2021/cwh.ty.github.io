@@ -23,12 +23,14 @@
     const KT_TO_MS = 0.514444, KT_TO_KMH = 1.852;
     const tz = 'Asia/Taipei';
     const THEME_STORAGE_KEY = 'cyclone-theme';
-    let currentTheme = 'color';
+    let currentTheme = 'night';
     try{
       const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-      if(storedTheme === 'mono'){
-        currentTheme = 'mono';
-        document.body.classList.add('theme-mono');
+      if(storedTheme === 'day' || storedTheme === 'mono'){
+        currentTheme = 'day';
+        document.body.classList.add('theme-day');
+      } else if(storedTheme === 'night' || storedTheme === 'color'){
+        currentTheme = 'night';
       }
     }catch{}
 
@@ -41,6 +43,7 @@
     const C_DEEPOR = '#ff7043';
     const C_RED    = '#e53935';
     const C_PURPLE = '#8e24aa';
+    const EARTH_RADIUS_KM = 6371;
 
     // UI refs
     const rootStyle = document.documentElement.style;
@@ -130,6 +133,24 @@
       if(detailTitle) detailTitle.textContent='點選節點以檢視詳細資料';
       if(detailSubtitle) detailSubtitle.textContent='同時支援決定性與系集成員。';
       [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailWindPrimary, detailCurrentTime, detailCurrentWind, detailPrevTime, detailPrevWind, detailNextTime, detailNextWind, detailKtClass, detailMsClass, detailPressure, detailTrend].forEach(el=>{ if(el) el.textContent='—'; });
+      if(detailKtClass){
+        detailKtClass.style.removeProperty('color');
+        detailKtClass.style.removeProperty('text-shadow');
+        const card = detailKtClass.closest('.metric-card');
+        if(card){
+          card.style.removeProperty('border-color');
+          card.style.removeProperty('box-shadow');
+        }
+      }
+      if(detailMsClass){
+        detailMsClass.style.removeProperty('color');
+        detailMsClass.style.removeProperty('text-shadow');
+        const card = detailMsClass.closest('.metric-card');
+        if(card){
+          card.style.removeProperty('border-color');
+          card.style.removeProperty('box-shadow');
+        }
+      }
       if(detailSystem) detailSystem.classList.remove('muted');
       if(detailMember) detailMember.classList.add('muted');
       if(detailPrevBtn) detailPrevBtn.disabled=true;
@@ -176,6 +197,27 @@
       if(detailCurrentWind) detailCurrentWind.textContent = info.windSummary || '—';
       if(detailKtClass) detailKtClass.textContent = info.ktClass || '—';
       if(detailMsClass) detailMsClass.textContent = info.msClass || '—';
+      if(info.intensityColor){
+        const color = info.intensityColor;
+        if(detailKtClass){
+          detailKtClass.style.color = color;
+          detailKtClass.style.textShadow = `0 0 18px ${withAlpha(color, 0.45)}`;
+          const ktCard = detailKtClass.closest('.metric-card');
+          if(ktCard){
+            ktCard.style.borderColor = withAlpha(color, 0.6);
+            ktCard.style.boxShadow = `0 16px 32px ${withAlpha(color, 0.22)}`;
+          }
+        }
+        if(detailMsClass){
+          detailMsClass.style.color = color;
+          detailMsClass.style.textShadow = `0 0 16px ${withAlpha(color, 0.35)}`;
+          const msCard = detailMsClass.closest('.metric-card');
+          if(msCard){
+            msCard.style.borderColor = withAlpha(color, 0.45);
+            msCard.style.boxShadow = `0 12px 26px ${withAlpha(color, 0.18)}`;
+          }
+        }
+      }
       if(detailPressure) detailPressure.textContent = info.pressure || '—';
       if(detailTrend) detailTrend.textContent = info.trend || '—';
 
@@ -404,34 +446,146 @@
       return '強烈颱風（≥51 m/s）';
     }
 
-    function computeTrend(prevEntry, currentEntry){
-      if(!prevEntry || !currentEntry) return '—';
-      const prevKt = prevEntry.kt;
-      const curKt = currentEntry.kt;
-      if(prevKt==null || curKt==null || !isFinite(prevKt) || !isFinite(curKt)) return '—';
-      const unitDelta = unitValueFromKt(curKt) - unitValueFromKt(prevKt);
-      const ktDelta = curKt - prevKt;
-      const prevDate = toUTCDate(prevEntry.timeUtc);
+    function withAlpha(hex, alpha){
+      if(!hex || typeof hex!=='string') return '';
+      const clean = hex.replace('#','');
+      let expanded;
+      if(clean.length===3){
+        expanded = clean.split('').map(ch=>ch+ch).join('');
+      }else if(clean.length===6){
+        expanded = clean;
+      }else{
+        return hex;
+      }
+      const r=parseInt(expanded.slice(0,2),16);
+      const g=parseInt(expanded.slice(2,4),16);
+      const b=parseInt(expanded.slice(4,6),16);
+      if([r,g,b].some(v=>Number.isNaN(v))) return hex;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function toRad(deg){ return deg * Math.PI / 180; }
+
+    function haversineDistance(lat1, lon1, lat2, lon2){
+      if([lat1, lon1, lat2, lon2].some(v=>v==null || !isFinite(v))) return NaN;
+      const φ1 = toRad(lat1);
+      const φ2 = toRad(lat2);
+      const Δφ = toRad(lat2 - lat1);
+      const Δλ = toRad(lon2 - lon1);
+      const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return EARTH_RADIUS_KM * c;
+    }
+
+    function bearingBetween(lat1, lon1, lat2, lon2){
+      if([lat1, lon1, lat2, lon2].some(v=>v==null || !isFinite(v))) return NaN;
+      const φ1 = toRad(lat1);
+      const φ2 = toRad(lat2);
+      const Δλ = toRad(lon2 - lon1);
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+      const θ = Math.atan2(y, x);
+      return (θ * 180 / Math.PI + 360) % 360;
+    }
+
+    function bearingToText(bearing){
+      if(!isFinite(bearing)) return '';
+      const dirs = ['北', '東北', '東', '東南', '南', '西南', '西', '西北'];
+      const idx = Math.round(bearing / 45) % 8;
+      return dirs[idx];
+    }
+
+    function formatHours(hours){
+      if(!isFinite(hours)) return '';
+      return hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1);
+    }
+
+    function computeTrend(prevEntry, currentEntry, nextEntry){
+      if(!currentEntry || currentEntry.kt==null || !isFinite(currentEntry.kt)){
+        return {summary:'—', advisory:''};
+      }
+      const summaryParts = [];
+      const advisoryParts = [];
       const curDate = toUTCDate(currentEntry.timeUtc);
-      const hourDelta = (curDate - prevDate) / 36e5;
-      const decimals = preferredUnit==='kt' ? 0 : (preferredUnit==='ms' ? 2 : 1);
-      const unitDeltaStr = `${unitDelta>=0?'+':''}${formatFixed(unitDelta, decimals)} ${unitLabel()}`;
-      const ktDeltaStr = `${ktDelta>=0?'+':''}${formatFixed(ktDelta,0)} kt`;
-      const hoursStr = isFinite(hourDelta) ? `｜Δ${formatFixed(Math.abs(hourDelta), hourDelta%1?1:0)}h` : '';
-      return `${unitDeltaStr}（${ktDeltaStr}${hoursStr}）`;
+
+      if(prevEntry && prevEntry.kt!=null && isFinite(prevEntry.kt)){
+        const prevDate = toUTCDate(prevEntry.timeUtc);
+        const hourDelta = (curDate - prevDate) / 36e5;
+        if(hourDelta > 0.01){
+          const ktDelta = currentEntry.kt - prevEntry.kt;
+          const unitDelta = unitValueFromKt(currentEntry.kt) - unitValueFromKt(prevEntry.kt);
+          const decimals = preferredUnit==='kt' ? 0 : (preferredUnit==='ms' ? 2 : 1);
+          const changeMagnitude = formatFixed(Math.abs(ktDelta), Math.abs(ktDelta) >= 10 ? 0 : 1);
+          if(Math.abs(ktDelta) < 1){
+            summaryParts.push(`過去 ${formatHours(hourDelta)} 小時強度大致持平（Δ${ktDelta>=0?'+':''}${formatFixed(ktDelta,0)} kt）`);
+          }else{
+            const rate = Math.abs(ktDelta) / hourDelta;
+            const pace = rate>=7 ? '快速' : rate>=4 ? '明顯' : rate>=2 ? '逐步' : '緩慢';
+            const action = ktDelta>0 ? '增強' : '減弱';
+            summaryParts.push(`過去 ${formatHours(hourDelta)} 小時${pace}${action} ${changeMagnitude} kt（Δ${ktDelta>=0?'+':''}${formatFixed(unitDelta, decimals)} ${unitLabel()}）`);
+          }
+          const dist = haversineDistance(prevEntry.lat, prevEntry.lon, currentEntry.lat, currentEntry.lon);
+          if(isFinite(dist) && dist > 5 && hourDelta > 0){
+            const speed = dist / hourDelta;
+            const bearing = bearingBetween(prevEntry.lat, prevEntry.lon, currentEntry.lat, currentEntry.lon);
+            const dirText = bearingToText(bearing) || '不定';
+            summaryParts.push(`以${dirText}方向移動，速度約 ${formatFixed(speed, speed>=100?0:1)} km/h`);
+          }
+        }
+      }
+
+      if(!summaryParts.length){
+        summaryParts.push('強度趨勢資訊不足');
+      }
+
+      if(nextEntry && nextEntry.kt!=null && isFinite(nextEntry.kt)){
+        const nextDate = toUTCDate(nextEntry.timeUtc);
+        const futureHours = (nextDate - curDate) / 36e5;
+        if(futureHours > 0.01){
+          const ktDelta = nextEntry.kt - currentEntry.kt;
+          const changeMagnitude = formatFixed(Math.abs(ktDelta), Math.abs(ktDelta) >= 10 ? 0 : 1);
+          if(Math.abs(ktDelta) < 1){
+            advisoryParts.push(`預測 ${formatHours(futureHours)} 小時內強度趨勢：維持現況。`);
+          }else{
+            const rate = Math.abs(ktDelta) / futureHours;
+            const pace = rate>=7 ? '快速' : rate>=4 ? '明顯' : rate>=2 ? '逐步' : '緩慢';
+            const action = ktDelta>0 ? '增強' : '減弱';
+            advisoryParts.push(`預測 ${formatHours(futureHours)} 小時內可能${pace}${action} ${changeMagnitude} kt。`);
+          }
+          const dist = haversineDistance(currentEntry.lat, currentEntry.lon, nextEntry.lat, nextEntry.lon);
+          if(isFinite(dist) && dist > 5 && futureHours > 0){
+            const speed = dist / futureHours;
+            const bearing = bearingBetween(currentEntry.lat, currentEntry.lon, nextEntry.lat, nextEntry.lon);
+            const dirText = bearingToText(bearing) || '不定';
+            advisoryParts.push(`路徑趨勢指向${dirText}方向，推估移動速度約 ${formatFixed(speed, speed>=100?0:1)} km/h。`);
+          }
+        }
+      }
+
+      if(!advisoryParts.length){
+        advisoryParts.push('預測資訊不足，建議持續留意更新。');
+      }
+
+      return {
+        summary: summaryParts.join('，') + '。',
+        advisory: advisoryParts.join(' ')
+      };
     }
 
     function buildSiblingInfo(nodeId){
       if(!nodeId) return null;
       const node = nodeStore.get(nodeId);
       if(!node) return null;
-      const kt = (node.point.wind!=null && isFinite(node.point.wind)) ? +node.point.wind : null;
+      const {point} = node;
+      const kt = (point.wind!=null && isFinite(point.wind)) ? +point.wind : null;
       return {
         nodeId,
-        timeTw: fmtTaiwan(node.point.valid_time),
-        timeUtc: node.point.valid_time,
+        timeTw: fmtTaiwan(point.valid_time),
+        timeUtc: point.valid_time,
         windSummary: windSummary(kt),
-        kt
+        kt,
+        lat: (point.lat!=null && isFinite(point.lat)) ? +point.lat : null,
+        lon: (point.lon!=null && isFinite(point.lon)) ? +point.lon : null
       };
     }
 
@@ -440,6 +594,17 @@
       if(!node) return;
       const {key, label, sample, isDet, point, prevId, nextId} = node;
       const kt = (point.wind!=null && isFinite(point.wind)) ? +point.wind : null;
+      const lat = (point.lat!=null && isFinite(point.lat)) ? +point.lat : null;
+      const lon = (point.lon!=null && isFinite(point.lon)) ? +point.lon : null;
+      const locationLabel = (lat!=null && lon!=null) ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : '—';
+      const currentEntry = { kt, timeUtc: point.valid_time, lat, lon };
+      const prevInfo = buildSiblingInfo(prevId);
+      const nextInfo = buildSiblingInfo(nextId);
+      const intensityColor = colorByKT6(kt);
+      const trendInsight = computeTrend(prevInfo, currentEntry, nextInfo);
+      const cautionParts = [];
+      if(trendInsight.advisory) cautionParts.push(trendInsight.advisory);
+      cautionParts.push(footerByWind(kt));
       const info = {
         nodeId,
         prevId: prevId || '',
@@ -451,17 +616,18 @@
         member: String(sample),
         timeTw: fmtTaiwan(point.valid_time),
         timeUtc: point.valid_time,
-        location: `${(+point.lat).toFixed(2)}, ${(+point.lon).toFixed(2)}`,
+        location: locationLabel,
         windPrimary: formatPrimaryWind(kt),
         windSummary: windSummary(kt),
         ktClass: classifyKT(kt),
         msClass: classifyMS(kt!=null?toMsFromKt(kt):null),
         pressure: (point.mslp!=null && !isNaN(point.mslp)) ? `${(+point.mslp).toFixed(1)} hPa` : '—',
-        footer: footerByWind(kt)
+        footer: cautionParts.join(' ').trim(),
+        intensityColor
       };
-      info.prev = buildSiblingInfo(prevId);
-      info.next = buildSiblingInfo(nextId);
-      info.trend = computeTrend(info.prev, {kt, timeUtc: point.valid_time});
+      info.prev = prevInfo;
+      info.next = nextInfo;
+      info.trend = trendInsight.summary || '—';
       showDetailPanel(info);
       if(shouldLog){ logOp(`檢視節點詳細：${label} sample ${sample} @ ${info.timeTw}`); }
     }
@@ -1125,11 +1291,13 @@
 
     // ====== 分享（狀態） ======
     function applyTheme(theme, {persist=true}={}){
-      currentTheme = (theme==='mono') ? 'mono' : 'color';
-      document.body.classList.toggle('theme-mono', currentTheme==='mono');
+      currentTheme = (theme==='day') ? 'day' : 'night';
+      document.body.classList.remove('theme-mono');
+      document.body.classList.toggle('theme-day', currentTheme==='day');
       if(themeToggle){
-        themeToggle.textContent = currentTheme==='mono' ? '🌈 彩色版面' : '🌗 黑白版面';
-        themeToggle.setAttribute('aria-pressed', currentTheme==='mono' ? 'true' : 'false');
+        themeToggle.textContent = currentTheme==='day' ? '🌙 夜間模式' : '☀️ 白天模式';
+        themeToggle.setAttribute('aria-pressed', currentTheme==='day' ? 'true' : 'false');
+        themeToggle.title = currentTheme==='day' ? '切換為夜間模式' : '切換為白天模式';
       }
       if(persist){
         try{ localStorage.setItem(THEME_STORAGE_KEY, currentTheme); }catch{}
@@ -1141,9 +1309,9 @@
 
     if(themeToggle){
       themeToggle.addEventListener('click', ()=>{
-        const next = currentTheme==='mono' ? 'color' : 'mono';
+        const next = currentTheme==='day' ? 'night' : 'day';
         applyTheme(next);
-        logOp(`版面主題切換：${next==='mono'?'黑白':'彩色'}`);
+        logOp(`版面主題切換：${next==='day'?'白天':'夜間'}`);
       });
     }
 
