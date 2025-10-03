@@ -367,6 +367,86 @@
     let detUseBlack=true;
     let currentDetailContext=null;
     let legendVisible=true;
+    let pendingSystemVisibility=null;
+    let pendingMapView=null;
+    let shouldPreserveView=false;
+    let pendingBaseName=null;
+    let suppressHashUpdate=false;
+
+    function extractSharedState(){
+      const hash = location.hash || '';
+      const match = hash.match(/(?:#|&)s=([^&]+)/);
+      if(!match) return null;
+      const obj = decodeHash(match[1]);
+      return (obj && typeof obj==='object') ? obj : null;
+    }
+
+    function applyInitialStateFromHash(){
+      const state = extractSharedState();
+      if(!state) return;
+      suppressHashUpdate=true;
+      if(state.u && ['kt','ms','kmh'].includes(state.u)){
+        preferredUnit = state.u;
+      }
+      if(state.md!=null){
+        showTracks = (+state.md)===0;
+      }
+      if(state.det!=null){
+        allDetVisible = !!(+state.det);
+      }
+      if(state.ens!=null){
+        allEnsVisible = !!(+state.ens);
+      }
+      if(state.pts!=null){
+        showPts = !!(+state.pts);
+      }
+      if(state.rad!=null){
+        showRadii = !!(+state.rad);
+      }
+      if(state.dm!=null){
+        detUseBlack = !!(+state.dm);
+      }
+      if(state.lg!=null){
+        legendVisible = !!(+state.lg);
+      }
+      if(state.b && typeof state.b==='string'){
+        pendingBaseName = state.b;
+      }
+      if(Array.isArray(state.c) && state.c.length===2){
+        const lat = Number(state.c[0]);
+        const lng = Number(state.c[1]);
+        if(isFinite(lat) && isFinite(lng)){
+          pendingMapView = pendingMapView || {};
+          pendingMapView.center = [lat, lng];
+          shouldPreserveView = true;
+        }
+      }
+      if(state.z!=null){
+        const zoom = Number(state.z);
+        if(isFinite(zoom)){
+          pendingMapView = pendingMapView || {};
+          pendingMapView.zoom = zoom;
+          shouldPreserveView = true;
+        }
+      }
+      if(state.sv && typeof state.sv==='object'){
+        pendingSystemVisibility = state.sv;
+      }
+
+      if(toggleDet) toggleDet.checked = allDetVisible;
+      if(toggleEns) toggleEns.checked = allEnsVisible;
+      if(togglePts) togglePts.checked = showPts;
+      if(toggleRadii) toggleRadii.checked = showRadii;
+      if(modeTracks && modeProb){
+        modeTracks.dataset.active = showTracks ? 'true' : 'false';
+        modeProb.dataset.active = showTracks ? 'false' : 'true';
+      }
+      if(detBlack && detIntensity){
+        detBlack.dataset.active = detUseBlack ? 'true' : 'false';
+        detIntensity.dataset.active = detUseBlack ? 'false' : 'true';
+      }
+      suppressHashUpdate=false;
+    }
 
     function updateSystemSummary(){
       const totalSystems = systemLayers.size;
@@ -427,6 +507,7 @@
       });
     }
     updateSystemSummary();
+    applyInitialStateFromHash();
 
     // ====== Helpers ======
     function toMsFromKt(kt){ return kt*KT_TO_MS; }
@@ -720,7 +801,18 @@
     const baseSat  = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'© Esri', maxZoom: 18});
     const basemaps = {"Carto Dark":baseDark, "OSM":baseOSM, "Esri 衛星":baseSat};
     let currentBase = "Carto Dark";
-    const map = L.map('map', { zoomControl:true, worldCopyJump:true, layers:[baseDark] }).setView([18,130], 3);
+    if(pendingBaseName && basemaps[pendingBaseName]){
+      currentBase = pendingBaseName;
+    }
+    const initialBase = basemaps[currentBase] || baseDark;
+    const initialCenter = (pendingMapView && Array.isArray(pendingMapView.center) && pendingMapView.center.length===2)
+      ? pendingMapView.center
+      : [18,130];
+    const initialZoom = (pendingMapView && typeof pendingMapView.zoom==='number' && isFinite(pendingMapView.zoom))
+      ? pendingMapView.zoom
+      : 3;
+    const map = L.map('map', { zoomControl:true, worldCopyJump:true, layers:[initialBase] }).setView(initialCenter, initialZoom);
+    pendingBaseName=null;
     map.on('click', ()=>{ resetDetailPanel(); });
     L.control.layers(basemaps, null, {position:'topright'}).addTo(map);
     map.createPane('probPane');  map.getPane('probPane').style.zIndex  = 300;
@@ -945,12 +1037,17 @@
     // ====== Probability（與時間無關） ======
     function rebuildHeatAllVisibleEns(){
       if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
+      if(!allEnsVisible || !showPts){
+        logOp('機率圖重建：系集或節點隱藏，跳過繪製');
+        return;
+      }
       const pts=[];
       systemLayers.forEach((entry)=>{
         if(!entry.visible) return;
         entry.ens.forEach(group=>{
           traverse(group, (child)=>{
-            if(child && child.__meta && child.__meta.type==='marker' && !child.__meta.isDet){
+            if(!child || !child.__meta) return;
+            if(child.__meta.type==='marker' && !child.__meta.isDet){
               const w = child.__meta.wind;
               const wt = (w!=null && !isNaN(w)) ? Math.min(1, Math.max(0, (w-20)/120)) : 0.3;
               const ll = child.getLatLng();
@@ -1053,6 +1150,19 @@
         reader.readAsText(file);
       });
     }
+    function applyPendingSystemVisibility(){
+      if(!pendingSystemVisibility) return;
+      systemLayers.forEach((entry, key)=>{
+        if(Object.prototype.hasOwnProperty.call(pendingSystemVisibility, key)){
+          const shouldShow = !!pendingSystemVisibility[key];
+          entry.visible = shouldShow;
+          const row = systemEntryMap.get(key);
+          const cb = row ? row.querySelector('input[type="checkbox"]') : null;
+          if(cb) cb.checked = shouldShow;
+        }
+      });
+      pendingSystemVisibility=null;
+    }
     function renderAll(rows){
       // Reset
       if(systemsDiv) systemsDiv.innerHTML='';
@@ -1099,8 +1209,23 @@
         addSystemControl(key, color, `${track} | ${source}`);
       });
 
+      applyPendingSystemVisibility();
       refreshVisibility();
-      if(has && bounds.isValid()){ map.fitBounds(bounds.pad(0.2)); } else { map.setView([18,130], 3); }
+      if(shouldPreserveView){
+        if(pendingMapView){
+          const center = (Array.isArray(pendingMapView.center) && pendingMapView.center.length===2) ? pendingMapView.center : null;
+          const zoom = (pendingMapView && typeof pendingMapView.zoom==='number' && isFinite(pendingMapView.zoom)) ? pendingMapView.zoom : null;
+          if(center){
+            map.setView(center, zoom!=null ? zoom : map.getZoom());
+          }else if(zoom!=null){
+            map.setZoom(zoom);
+          }
+        }
+      }else{
+        if(has && bounds.isValid()){ map.fitBounds(bounds.pad(0.2)); } else { map.setView([18,130], 3); }
+      }
+      shouldPreserveView=false;
+      pendingMapView=null;
 
       buildTsSystemOptions();
       buildTsChart();
@@ -1254,12 +1379,16 @@
       return {
         u: preferredUnit, b: currentBase, c: [ +c.lat.toFixed(4), +c.lng.toFixed(4) ], z,
         md: showTracks ? 0 : 1, det: +allDetVisible, ens: +allEnsVisible, pts: +showPts, rad: +showRadii, dm: +detUseBlack,
+        lg: +legendVisible,
         sv: sysVis
       };
     }
     function encodeHash(obj){ return btoa(encodeURIComponent(JSON.stringify(obj))); }
     function decodeHash(h){ try{ return JSON.parse(decodeURIComponent(atob(h))); }catch(e){ return null; } }
-    function updateHashNow(){ location.hash = 's=' + encodeHash(serializeState()); }
+    function updateHashNow(){
+      if(suppressHashUpdate) return;
+      location.hash = 's=' + encodeHash(serializeState());
+    }
     async function shareView(){
       updateHashNow();
       const url = location.href;
