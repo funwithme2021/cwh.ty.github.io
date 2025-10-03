@@ -59,6 +59,7 @@
     const btnShare=document.getElementById('btnShare');
     const btnShareTop=document.getElementById('btnShareTop');
     const btnOpenWL=document.getElementById('btnOpenWL');
+    const btnThemeToggle=document.getElementById('btnThemeToggle');
 
     const systemSummary=document.getElementById('systemSummary');
     const systemFilter=document.getElementById('systemFilter');
@@ -97,6 +98,13 @@
     const detailClose=document.getElementById('detailClose');
 
     const toastEl=document.getElementById('toast');
+    const tsInspector=document.getElementById('tsInspector');
+    const tsInfoTime=document.getElementById('tsInfoTime');
+    const tsInfoValue=document.getElementById('tsInfoValue');
+    const tsInfoWind=document.getElementById('tsInfoWind');
+    const tsInfoClass=document.getElementById('tsInfoClass');
+    let tsInspectorRows=[];
+    let tsInspectorIndex=null;
     function showToast(msg){ toastEl.textContent=msg; toastEl.style.display='block'; setTimeout(()=>toastEl.style.display='none', 1600); }
 
     function setActiveSystem(key){
@@ -113,13 +121,16 @@
 
     function resetDetailPanel(){
       if(!detailPanel) return;
-      detailPanel.classList.add('hidden');
+      detailPanel.classList.remove('hidden');
+      detailPanel.classList.add('empty');
       detailPanel.dataset.node='';
       detailPanel.dataset.prev='';
       detailPanel.dataset.next='';
       if(detailTitle) detailTitle.textContent='點選節點以檢視詳細資料';
       if(detailSubtitle) detailSubtitle.textContent='同時支援決定性與系集成員。';
       [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailWindPrimary, detailCurrentTime, detailCurrentWind, detailPrevTime, detailPrevWind, detailNextTime, detailNextWind, detailKtClass, detailMsClass, detailPressure, detailTrend].forEach(el=>{ if(el) el.textContent='—'; });
+      if(detailSystem) detailSystem.textContent='尚未選擇';
+      if(detailWind) detailWind.textContent='請在地圖點選節點';
       if(detailPrevBtn) detailPrevBtn.disabled=true;
       if(detailNextBtn) detailNextBtn.disabled=true;
       if(detailPrevCard) detailPrevCard.classList.add('inactive');
@@ -140,6 +151,7 @@
     function showDetailPanel(info){
       if(!detailPanel || !info) return;
       detailPanel.classList.remove('hidden');
+      detailPanel.classList.remove('empty');
       detailPanel.dataset.node = info.nodeId || '';
       detailPanel.dataset.prev = info.prevId || '';
       detailPanel.dataset.next = info.nextId || '';
@@ -194,6 +206,7 @@
     const tsSystemSel=document.getElementById('tsSystemSel');
     const tsModeDet=document.getElementById('tsModeDet');
     const tsModeEns=document.getElementById('tsModeEns');
+    const tsCanvasEl=document.getElementById('tsChart');
     let tsChart=null;
 
     // 歷史操作
@@ -203,6 +216,70 @@
       historyLogEl.textContent += `[${t}] ${msg}\n`;
       historyLogEl.scrollTop = historyLogEl.scrollHeight;
     }
+
+    // Theme toggle
+    const themeStorageKey='cyclone-theme';
+    let currentTheme='color';
+    try{
+      const stored=localStorage.getItem(themeStorageKey);
+      if(stored==='mono') currentTheme='mono';
+    }catch{}
+    function applyTheme(theme){
+      if(theme==='mono'){
+        document.body.dataset.theme='mono';
+        if(btnThemeToggle){
+          btnThemeToggle.textContent='切換彩色模式';
+          btnThemeToggle.setAttribute('aria-pressed','true');
+        }
+      }else{
+        delete document.body.dataset.theme;
+        if(btnThemeToggle){
+          btnThemeToggle.textContent='切換黑白模式';
+          btnThemeToggle.setAttribute('aria-pressed','false');
+        }
+      }
+    }
+    applyTheme(currentTheme);
+    if(btnThemeToggle){
+      btnThemeToggle.addEventListener('click', ()=>{
+        currentTheme = currentTheme==='mono' ? 'color' : 'mono';
+        applyTheme(currentTheme);
+        try{ localStorage.setItem(themeStorageKey, currentTheme); }catch{}
+        logOp(`切換主題：${currentTheme==='mono'?'黑白':'彩色'}`);
+      });
+    }
+
+    // Panel collapsible controls
+    const panelStateKey='cyclone-panel-state';
+    let panelStates={};
+    try{
+      const stored=localStorage.getItem(panelStateKey);
+      if(stored) panelStates=JSON.parse(stored) || {};
+    }catch{ panelStates={}; }
+    document.querySelectorAll('.panel').forEach(panel=>{
+      const toggle=panel.querySelector('.panel-toggle');
+      const body=panel.querySelector('.panel-body');
+      if(!toggle || !body) return;
+      const pid=panel.dataset.panelId || panel.id || toggle.id || panel.querySelector('.panel-title')?.textContent?.trim() || Math.random().toString(36).slice(2);
+      let expanded = toggle.getAttribute('aria-expanded') !== 'false';
+      if(Object.prototype.hasOwnProperty.call(panelStates, pid)){
+        expanded = !!panelStates[pid];
+      }
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      body.hidden = !expanded;
+      panel.classList.toggle('collapsed', !expanded);
+      toggle.addEventListener('click', ()=>{
+        const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+        const next = !isExpanded;
+        toggle.setAttribute('aria-expanded', next ? 'true' : 'false');
+        body.hidden = !next;
+        panel.classList.toggle('collapsed', !next);
+        panelStates[pid] = next;
+        try{ localStorage.setItem(panelStateKey, JSON.stringify(panelStates)); }catch{}
+        const title = panel.querySelector('.panel-title')?.textContent?.trim() || pid;
+        logOp(`面板「${title}」${next?'展開':'收合'}`);
+      });
+    });
 
     // App state
     const systemLayers=new Map(); // key -> {group, det:[], ens:[], color, visible:true, label}
@@ -419,7 +496,7 @@
     }
 
     function refreshDetailForUnit(){
-      if(!detailPanel || detailPanel.classList.contains('hidden')) return;
+      if(!detailPanel || detailPanel.classList.contains('empty')) return;
       const nodeId = detailPanel.dataset.node;
       if(nodeId) openNode(nodeId, false);
     }
@@ -887,11 +964,12 @@
         m.get(sKey).push(r);
       });
 
-      const bounds=L.latLngBounds(); let has=false;
+      const bounds=L.latLngBounds(); let has=false; let firstKey=null;
       bySys.forEach((samples, key)=>{
         const [source, track] = key.split(' | ');
         const color=hashColor(key);
         const label=`${track} (${source})`;
+        if(!firstKey) firstKey=key;
 
         // ensemble
         samples.forEach((pts, s)=>{
@@ -919,9 +997,79 @@
       buildTsSystemOptions();
       buildTsChart();
       updateSystemSummary();
+      if(firstKey) setActiveSystem(firstKey);
       updateHashNow();
       logOp(`重繪地圖完成：系統 ${systemLayers.size}`);
     }
+
+    function refreshTsInspector(idx){
+      if(!tsInspector) return;
+      if(!tsInspectorRows.length){
+        tsInspectorIndex=null;
+        if(tsInfoTime) tsInfoTime.textContent='尚無資料';
+        const unit=unitLabel();
+        if(tsInfoValue) tsInfoValue.textContent=`— ${unit}`;
+        if(tsInfoWind) tsInfoWind.textContent='—｜—｜—';
+        if(tsInfoClass) tsInfoClass.textContent='—';
+        return;
+      }
+      let useIdx = Number.isFinite(idx) ? idx : (tsInspectorIndex!=null ? tsInspectorIndex : tsInspectorRows.length-1);
+      useIdx = Math.max(0, Math.min(useIdx, tsInspectorRows.length-1));
+      tsInspectorIndex = useIdx;
+      const row = tsInspectorRows[useIdx];
+      const label = fmtTaiwan(row.t);
+      const unit = unitLabel();
+      const hasKt = row.kt!=null && isFinite(row.kt);
+      if(tsInfoTime) tsInfoTime.textContent = label || '—';
+      if(tsInfoValue) tsInfoValue.textContent = hasKt ? formatPrimaryWind(row.kt) : `— ${unit}`;
+      if(tsInfoWind){
+        tsInfoWind.textContent = hasKt ? windSummary(row.kt) : '—｜—｜—';
+      }
+      if(tsInfoClass){
+        if(hasKt){
+          if(preferredUnit==='ms'){
+            tsInfoClass.textContent = classifyMS(toMsFromKt(row.kt)) || '—';
+          }else{
+            tsInfoClass.textContent = classifyKT(row.kt) || '—';
+          }
+        }else{
+          tsInfoClass.textContent='—';
+        }
+      }
+    }
+    function handleTsCanvasLeave(){
+      if(!tsInspectorRows.length){ refreshTsInspector(); return; }
+      refreshTsInspector(tsInspectorRows.length-1);
+    }
+    function handleTsKeydown(e){
+      if(!tsInspectorRows.length) return;
+      const maxIndex = tsInspectorRows.length-1;
+      const baseIndex = (tsInspectorIndex!=null ? tsInspectorIndex : maxIndex);
+      switch(e.key?.toLowerCase()){
+        case 'arrowleft':
+          e.preventDefault();
+          refreshTsInspector(Math.max(0, baseIndex-1));
+          break;
+        case 'arrowright':
+          e.preventDefault();
+          refreshTsInspector(Math.min(maxIndex, baseIndex+1));
+          break;
+        case 'home':
+          e.preventDefault();
+          refreshTsInspector(0);
+          break;
+        case 'end':
+          e.preventDefault();
+          refreshTsInspector(maxIndex);
+          break;
+      }
+    }
+    if(tsCanvasEl){
+      tsCanvasEl.addEventListener('mouseleave', handleTsCanvasLeave);
+      tsCanvasEl.addEventListener('focusout', handleTsCanvasLeave);
+      tsCanvasEl.addEventListener('keydown', handleTsKeydown);
+    }
+    refreshTsInspector();
 
     // ====== 時間 × 強度圖 ======
     function gatherRowsForChart(mode, sysKey){
@@ -982,7 +1130,7 @@
       }
     }
     function buildTsChart(){
-      const canvas = document.getElementById('tsChart');
+      const canvas = tsCanvasEl || document.getElementById('tsChart');
       if(!canvas){ logOp('找不到 tsChart 畫布'); return; }
 
       const keys = Array.from(systemLayers.keys()).filter(k=>systemLayers.get(k)?.visible);
@@ -996,6 +1144,9 @@
       const rows = gatherRowsForChart(mode, key);
       if(!rows.length){
         if(tsChart){ tsChart.destroy(); tsChart=null; }
+        tsInspectorRows=[];
+        tsInspectorIndex=null;
+        refreshTsInspector();
         logOp(`時間×強度：${key}（${mode==='det'?'決定性':'所有系集'}）無資料`);
         return;
       }
@@ -1029,6 +1180,15 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode:'nearest', intersect:false, axis:'x' },
+          onHover: (_evt, elements)=>{
+            if(elements && elements.length){
+              const idx = elements[0].index;
+              refreshTsInspector(idx);
+            }else{
+              refreshTsInspector();
+            }
+          },
           scales: {
             x: { ticks:{ color:'#cfe3ff' }, grid:{ color:'#223' }},
             y: { ticks:{ color:'#cfe3ff' }, grid:{ color:'#223' }, title:{ display:true, text: unitLabel(), color:'#cfe3ff'} }
@@ -1036,17 +1196,7 @@
           plugins: {
             legend: { labels: { color:'#cfe3ff' } },
             tooltip: {
-              callbacks: {
-                label: (ctx)=>{
-                  const i = safeIdx(ctx.dataIndex);
-                  const kt  = kts[i];
-                  const ms  = (kt!=null)? toMsFromKt(kt).toFixed(2) : '—';
-                  const kmh = (kt!=null)? (kt*1.852).toFixed(1) : '—';
-                  const grade = (preferredUnit==='ms') ? classifyMS(kt!=null?toMsFromKt(kt):null) : classifyKT(kt);
-                  const val = (typeof ctx.raw==='number') ? ctx.raw.toFixed(2) : ctx.raw;
-                  return ` ${val} ${unitLabel()}｜${kt??'—'} kt｜${ms} m/s｜${kmh} km/h｜${grade}`;
-                }
-              }
+              enabled: false
             }
           }
         }
@@ -1055,6 +1205,9 @@
       try{
         if(tsChart){ tsChart.destroy(); }
         tsChart = new Chart(canvas, cfg);
+        tsInspectorRows = rows;
+        tsInspectorIndex=null;
+        refreshTsInspector(rows.length-1);
         logOp(`時間×強度圖重繪：${key}（${mode==='det'?'決定性':'所有系集'}），樣本 ${values.length}`);
       }catch(err){
         logOp('時間×強度圖繪製失敗：'+ (err && err.message ? err.message : err));
@@ -1171,13 +1324,13 @@
           cycleUnit();
           break;
         case 'arrowleft':
-          if(detailPanel && !detailPanel.classList.contains('hidden')){
+          if(detailPanel && !detailPanel.classList.contains('empty')){
             const prevId = detailPanel.dataset.prev;
             if(prevId){ e.preventDefault(); openNode(prevId); }
           }
           break;
         case 'arrowright':
-          if(detailPanel && !detailPanel.classList.contains('hidden')){
+          if(detailPanel && !detailPanel.classList.contains('empty')){
             const nextId = detailPanel.dataset.next;
             if(nextId){ e.preventDefault(); openNode(nextId); }
           }
@@ -1190,7 +1343,7 @@
     btnCollapse.addEventListener('click', ()=>{
       if(app.classList.contains('collapsed')){
         app.classList.remove('collapsed');
-        rootStyle.setProperty('--sidebar-w','440px');
+        rootStyle.removeProperty('--sidebar-w');
         btnCollapse.textContent='隱藏資料面板';
         btnCollapse.setAttribute('aria-expanded','true');
         logOp('展開資料面板');

@@ -38,18 +38,24 @@
       <div class="intro-actions">
         <button class="btn" id="btnCollapse">隱藏資料面板</button>
         <button class="btn outline" id="btnShareTop">分享目前視圖</button>
+        <button class="btn ghost" id="btnThemeToggle" aria-pressed="false">切換黑白模式</button>
       </div>
     </section>
 
     <div id="app" class="app-grid">
       <aside id="sidebar" aria-label="資料操作面板">
         <div class="panel-group">
-          <section class="panel">
-            <header>
-              <div class="panel-title">線上資料</div>
-              <p class="panel-sub">DeepMind WeatherLab</p>
+          <section class="panel" data-panel-id="online">
+            <header class="panel-header">
+              <div>
+                <div class="panel-title">線上資料</div>
+                <p class="panel-sub">DeepMind WeatherLab</p>
+              </div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-online-body">
+                <span class="sr-only">切換「線上資料」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-online-body">
               <div class="field-grid">
                 <label for="dmModel">模型</label>
                 <select id="dmModel">
@@ -70,12 +76,17 @@
             </div>
           </section>
 
-          <section class="panel">
-            <header>
-              <div class="panel-title">匯入資料</div>
-              <p class="panel-sub">支援多個 CSV</p>
+          <section class="panel" data-panel-id="import">
+            <header class="panel-header">
+              <div>
+                <div class="panel-title">匯入資料</div>
+                <p class="panel-sub">支援多個 CSV</p>
+              </div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-import-body">
+                <span class="sr-only">切換「匯入資料」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-import-body">
               <label class="upload" id="fileLabel">
                 <input type="file" id="csvFiles" accept=".csv" multiple/>
                 <span>📄 點我匯入多個 CSV</span>
@@ -83,12 +94,17 @@
             </div>
           </section>
 
-          <section class="panel">
-            <header>
-              <div class="panel-title">視圖模式</div>
-              <p class="panel-sub">選擇路線或機率熱度</p>
+          <section class="panel" data-panel-id="view-mode">
+            <header class="panel-header">
+              <div>
+                <div class="panel-title">視圖模式</div>
+                <p class="panel-sub">選擇路線或機率熱度</p>
+              </div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-view-body">
+                <span class="sr-only">切換「視圖模式」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-view-body">
               <div class="chip-row">
                 <span class="chip" id="modeTracks" data-active="true">路線圖</span>
                 <span class="chip" id="modeProb">機率圖</span>
@@ -97,11 +113,14 @@
             </div>
           </section>
 
-          <section class="panel">
-            <header>
+          <section class="panel" data-panel-id="det-color">
+            <header class="panel-header">
               <div class="panel-title">決定性顏色</div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-det-body">
+                <span class="sr-only">切換「決定性顏色」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-det-body">
               <div class="chip-row">
                 <span class="chip" id="detBlack" data-active="true">黑線</span>
                 <span class="chip" id="detIntensity">強度上色</span>
@@ -109,11 +128,14 @@
             </div>
           </section>
 
-          <section class="panel">
-            <header>
+          <section class="panel" data-panel-id="visibility">
+            <header class="panel-header">
               <div class="panel-title">顯示選項</div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-visibility-body">
+                <span class="sr-only">切換「顯示選項」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-visibility-body">
               <div class="toggle-grid">
                 <label class="toggle"><input type="checkbox" id="toggleDet" checked><span>決定性</span></label>
                 <label class="toggle"><input type="checkbox" id="toggleEns" checked><span>系集</span></label>
@@ -123,11 +145,14 @@
             </div>
           </section>
 
-          <section class="panel">
-            <header>
+          <section class="panel" data-panel-id="converter">
+            <header class="panel-header">
               <div class="panel-title">風速換算</div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-converter-body">
+                <span class="sr-only">切換「風速換算」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-converter-body">
               <div class="field-grid compact">
                 <input type="number" id="wsValue" placeholder="數值" step="0.01"/>
                 <select id="wsUnit">
@@ -141,48 +166,46 @@
             </div>
           </section>
 
-          <section class="panel">
-            <header>
-              <div class="panel-title">系統清單</div>
-              <p class="panel-sub">track_id | 檔名</p>
+          <section class="panel" data-panel-id="systems">
+            <header class="panel-header">
+              <div>
+                <div class="panel-title">系統清單</div>
+                <p class="panel-sub">track_id | 檔名</p>
+              </div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-systems-body">
+                <span class="sr-only">切換「系統清單」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-systems-body">
               <input class="search" id="systemFilter" type="search" placeholder="搜尋系統或檔案"/>
               <div class="status muted" id="systemSummary">尚無資料</div>
               <div id="systems" class="sys-list"></div>
             </div>
           </section>
 
-          <section class="panel">
-            <header>
-              <div class="panel-title">時間 × 強度圖</div>
-            </header>
-            <div class="panel-body">
-              <div class="chip-row dense">
-                <select id="tsSystemSel"></select>
-                <span class="chip" id="tsModeDet" data-active="true">決定性</span>
-                <span class="chip" id="tsModeEns">所有系集</span>
-              </div>
-              <div id="tsWrap"><canvas id="tsChart"></canvas></div>
-              <p class="note">滑鼠移入圖表，可檢視節點詳細資訊與分級。</p>
-            </div>
-          </section>
-
-          <section class="panel">
-            <header>
+          <section class="panel" data-panel-id="history">
+            <header class="panel-header">
               <div class="panel-title">歷史操作與診斷</div>
+              <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-history-body">
+                <span class="sr-only">切換「歷史操作與診斷」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-history-body">
               <div id="historyLog" class="history"></div>
             </div>
           </section>
 
-          <section class="panel">
-            <header>
-              <div class="panel-title">鍵盤快捷鍵</div>
-              <p class="panel-sub">桌面版最佳化操作</p>
+          <section class="panel" data-panel-id="shortcuts">
+            <header class="panel-header">
+              <div>
+                <div class="panel-title">鍵盤快捷鍵</div>
+                <p class="panel-sub">桌面版最佳化操作</p>
+              </div>
+              <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="panel-shortcuts-body">
+                <span class="sr-only">切換「鍵盤快捷鍵」區塊</span>
+              </button>
             </header>
-            <div class="panel-body">
+            <div class="panel-body" id="panel-shortcuts-body" hidden>
               <ul class="shortcut-list">
                 <li><kbd>Shift</kbd> + <kbd>C</kbd>：收合／展開資料面板</li>
                 <li><kbd>Shift</kbd> + <kbd>L</kbd>：載入最新可用循環</li>
@@ -196,78 +219,104 @@
           </section>
         </div>
       </aside>
-
-      <section class="map-area">
-        <div class="map-container">
-          <div id="map"></div>
-          <div class="legend" id="legend" aria-live="polite">
-            <div class="legend-scale">
-              <div class="scale-bar" id="legendGradient"></div>
-              <div class="scale-labels" id="legendStops"></div>
-            </div>
-            <div class="legend-list" id="legendText"></div>
-            <div class="tools">
-              <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
-              <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
+      <section class="workspace">
+        <div class="workspace-main">
+          <div class="map-card">
+            <div class="map-container">
+              <div id="map"></div>
+              <div class="legend" id="legend" aria-live="polite">
+                <div class="legend-scale">
+                  <div class="scale-bar" id="legendGradient"></div>
+                  <div class="scale-labels" id="legendStops"></div>
+                </div>
+                <div class="legend-list" id="legendText"></div>
+                <div class="tools">
+                  <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
+                  <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
+                </div>
+              </div>
             </div>
           </div>
-          <aside class="detail-drawer" id="detailPanel">
-            <div class="drawer-header">
+          <aside class="detail-panel" id="detailPanel">
+            <div class="detail-header">
               <div>
                 <h3 id="detailTitle">點選節點以檢視詳細資料</h3>
                 <p id="detailSubtitle">同時支援決定性與系集成員。</p>
               </div>
-              <div class="drawer-controls">
+              <div class="detail-controls">
                 <button class="icon-btn" id="detailPrevBtn" aria-label="上一節點" disabled>←</button>
                 <button class="icon-btn" id="detailNextBtn" aria-label="下一節點" disabled>→</button>
                 <button class="icon-btn" id="detailClose" aria-label="關閉詳細資訊">×</button>
               </div>
             </div>
-            <div class="drawer-body">
-              <div class="detail-meta-grid">
-                <div class="meta-item"><span class="meta-label">系統</span><span class="meta-value" id="detailSystem">—</span></div>
-                <div class="meta-item"><span class="meta-label">成員</span><span class="meta-value" id="detailMember">—</span></div>
-                <div class="meta-item"><span class="meta-label">時間（台灣）</span><span class="meta-value" id="detailTimeTw">—</span></div>
-                <div class="meta-item"><span class="meta-label">時間（UTC）</span><span class="meta-value" id="detailTimeUtc">—</span></div>
-                <div class="meta-item"><span class="meta-label">位置</span><span class="meta-value" id="detailLocation">—</span></div>
-                <div class="meta-item"><span class="meta-label">中心氣壓</span><span class="meta-value" id="detailPressure">—</span></div>
-              </div>
-              <div class="detail-metrics">
-                <div class="metric-card">
-                  <span class="metric-label">目前風速</span>
+            <div class="detail-hero">
+              <div class="detail-hero-left">
+                <div class="detail-badges">
+                  <span class="badge system" id="detailSystem">—</span>
+                  <span class="badge member" id="detailMember">—</span>
+                </div>
+                <div class="detail-wind">
                   <span class="metric-value" id="detailWindPrimary">—</span>
                   <span class="metric-sub" id="detailWind">—</span>
                 </div>
-                <div class="metric-card">
-                  <span class="metric-label">分級（kt）</span>
-                  <span class="metric-value" id="detailKtClass">—</span>
-                </div>
-                <div class="metric-card">
-                  <span class="metric-label">分級（m/s）</span>
-                  <span class="metric-value" id="detailMsClass">—</span>
-                </div>
               </div>
-              <div class="detail-timeline">
-                <div class="timeline-card" id="detailPrevCard">
-                  <div class="timeline-title">上一時刻</div>
-                  <div class="timeline-time" id="detailPrevTime">—</div>
-                  <div class="timeline-wind" id="detailPrevWind">—</div>
-                </div>
-                <div class="timeline-card current">
-                  <div class="timeline-title">目前節點</div>
-                  <div class="timeline-time" id="detailCurrentTime">—</div>
-                  <div class="timeline-wind" id="detailCurrentWind">—</div>
-                  <div class="timeline-trend" id="detailTrend">—</div>
-                </div>
-                <div class="timeline-card" id="detailNextCard">
-                  <div class="timeline-title">下一時刻</div>
-                  <div class="timeline-time" id="detailNextTime">—</div>
-                  <div class="timeline-wind" id="detailNextWind">—</div>
-                </div>
+              <div class="detail-grades">
+                <span class="grade" id="detailKtClass">—</span>
+                <span class="grade alt" id="detailMsClass">—</span>
               </div>
-              <div class="drawer-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
             </div>
+            <div class="detail-meta-grid">
+              <div class="meta-item"><span class="meta-label">時間（台灣）</span><span class="meta-value" id="detailTimeTw">—</span></div>
+              <div class="meta-item"><span class="meta-label">時間（UTC）</span><span class="meta-value" id="detailTimeUtc">—</span></div>
+              <div class="meta-item"><span class="meta-label">位置</span><span class="meta-value" id="detailLocation">—</span></div>
+              <div class="meta-item"><span class="meta-label">中心氣壓</span><span class="meta-value" id="detailPressure">—</span></div>
+            </div>
+            <div class="detail-timeline">
+              <div class="timeline-card" id="detailPrevCard">
+                <div class="timeline-title">上一時刻</div>
+                <div class="timeline-time" id="detailPrevTime">—</div>
+                <div class="timeline-wind" id="detailPrevWind">—</div>
+              </div>
+              <div class="timeline-card current">
+                <div class="timeline-title">目前節點</div>
+                <div class="timeline-time" id="detailCurrentTime">—</div>
+                <div class="timeline-wind" id="detailCurrentWind">—</div>
+                <div class="timeline-trend" id="detailTrend">—</div>
+              </div>
+              <div class="timeline-card" id="detailNextCard">
+                <div class="timeline-title">下一時刻</div>
+                <div class="timeline-time" id="detailNextTime">—</div>
+                <div class="timeline-wind" id="detailNextWind">—</div>
+              </div>
+            </div>
+            <div class="detail-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
           </aside>
+        </div>
+        <div class="analysis-grid">
+          <section class="analysis-card time-card" aria-labelledby="time-card-title">
+            <header class="analysis-header">
+              <div>
+                <h2 id="time-card-title">時間 × 強度圖</h2>
+                <p class="analysis-sub">比較決定性與系集變化，詳細數值顯示於下方資訊列。</p>
+              </div>
+              <div class="chip-row dense">
+                <select id="tsSystemSel"></select>
+                <span class="chip" id="tsModeDet" data-active="true">決定性</span>
+                <span class="chip" id="tsModeEns">所有系集</span>
+              </div>
+            </header>
+            <div id="tsWrap"><canvas id="tsChart" tabindex="0" aria-describedby="tsInspector"></canvas></div>
+            <div class="ts-inspector" id="tsInspector">
+              <div class="ts-inspector-main">
+                <span class="ts-time" id="tsInfoTime">尚無資料</span>
+                <span class="ts-value" id="tsInfoValue">—</span>
+              </div>
+              <div class="ts-inspector-meta">
+                <span class="ts-wind" id="tsInfoWind">—</span>
+                <span class="ts-grade" id="tsInfoClass">—</span>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
     </div>
