@@ -22,17 +22,8 @@
     let preferredUnit = (initialState && ['kt','ms','kmh'].includes(initialState.u)) ? initialState.u : 'kt'; // 'kt' | 'ms' | 'kmh'
     const KT_TO_MS = 0.514444, KT_TO_KMH = 1.852;
     const tz = 'Asia/Taipei';
-    const THEME_STORAGE_KEY = 'cyclone-theme';
-    let currentTheme = 'night';
-    try{
-      const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-      if(storedTheme === 'day' || storedTheme === 'mono'){
-        currentTheme = 'day';
-        document.body.classList.add('theme-day');
-      } else if(storedTheme === 'night' || storedTheme === 'color'){
-        currentTheme = 'night';
-      }
-    }catch{}
+    const themeController = window.CycloneTheme;
+    let currentTheme = themeController ? themeController.current : (document.body.classList.contains('theme-day') ? 'day' : 'night');
 
     // 配色
     const C_GRAY   = '#8E8E8E';
@@ -68,7 +59,6 @@
     const wsOut=document.getElementById('wsOut');
 
     const unitToggle=document.getElementById('unitToggle');
-    const themeToggle=document.getElementById('themeToggle');
     const btnShare=document.getElementById('btnShare');
     const btnShareTop=document.getElementById('btnShareTop');
     const btnOpenWL=document.getElementById('btnOpenWL');
@@ -103,6 +93,9 @@
     const detailNextBtn=document.getElementById('detailNextBtn');
     const detailPrevCard=document.getElementById('detailPrevCard');
     const detailNextCard=document.getElementById('detailNextCard');
+    const detailPrevGrade=document.getElementById('detailPrevGrade');
+    const detailCurrentGrade=document.getElementById('detailCurrentGrade');
+    const detailNextGrade=document.getElementById('detailNextGrade');
     const detailKtClass=document.getElementById('detailKtClass');
     const detailMsClass=document.getElementById('detailMsClass');
     const detailPressure=document.getElementById('detailPressure');
@@ -132,7 +125,9 @@
       detailPanel.dataset.next='';
       if(detailTitle) detailTitle.textContent='點選節點以檢視詳細資料';
       if(detailSubtitle) detailSubtitle.textContent='同時支援決定性與系集成員。';
-      [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailWindPrimary, detailCurrentTime, detailCurrentWind, detailPrevTime, detailPrevWind, detailNextTime, detailNextWind, detailKtClass, detailMsClass, detailPressure, detailTrend].forEach(el=>{ if(el) el.textContent='—'; });
+      [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailWindPrimary, detailCurrentTime, detailCurrentWind, detailPrevTime, detailPrevWind, detailNextTime, detailNextWind, detailKtClass, detailMsClass, detailPressure].forEach(el=>{ if(el) el.textContent='—'; });
+      [detailPrevGrade, detailCurrentGrade, detailNextGrade].forEach(el=>{ if(el){ el.textContent='—'; el.style.removeProperty('color'); } });
+      if(detailTrend) detailTrend.textContent = '趨勢摘要｜暫無資訊，請先選擇節點。';
       if(detailKtClass){
         detailKtClass.style.removeProperty('color');
         detailKtClass.style.removeProperty('text-shadow');
@@ -157,17 +152,37 @@
       if(detailNextBtn) detailNextBtn.disabled=true;
       if(detailPrevCard) detailPrevCard.classList.add('inactive');
       if(detailNextCard) detailNextCard.classList.add('inactive');
-      if(detailFooter) detailFooter.textContent='選擇節點後顯示更多提示與建議操作。';
+      if(detailFooter) detailFooter.textContent='下一步建議｜點選節點後，這裡會提供風險提示與建議操作。';
       setActiveSystem(null);
     }
 
+    function shortGradeLabel(label){
+      if(!label || label==='—') return '';
+      const idx = label.indexOf('（');
+      return idx>0 ? label.slice(0, idx) : label;
+    }
+
     function footerByWind(kt){
-      if(kt==null || !isFinite(kt)) return '尚無風速資訊，可透過節點或系統列表確認資料來源。';
-      if(kt>=130) return '⚠️ 極強熱帶氣旋，建議密切關注官方發布與防災資訊。';
-      if(kt>=96) return '強颱層級，留意可能的快速增強或路徑變化。';
-      if(kt>=64) return '中度以上颱風，建議提前評估防颱措施與應變計畫。';
-      if(kt>=34) return '熱帶風暴或以上，注意未來 24 小時的變化趨勢。';
-      return '熱帶性低壓或擾動，持續觀察是否有發展跡象。';
+      if(kt==null || !isFinite(kt)){
+        return '暫無風速資訊，可透過節點列表確認資料來源，或比較其他系統的節點。';
+      }
+      const grade = classifyKT(kt);
+      const title = shortGradeLabel(grade) || '目前強度資訊';
+      let suggestion;
+      let tail = '搭配「時間 × 強度圖」與機率圖檢視趨勢。';
+      if(kt>=130){
+        suggestion = '⚠️ 請同步檢視系集共識並啟動最高等級應變';
+        tail = '立即透過分享功能通知團隊，並搭配「時間 × 強度圖」掌握變化。';
+      }else if(kt>=96){
+        suggestion = '建議安排路徑情境演練並確認風圈覆蓋範圍';
+      }else if(kt>=64){
+        suggestion = '適合評估沿岸與離島備戰，並追蹤下一時刻預報';
+      }else if(kt>=34){
+        suggestion = '可比較決定性與系集差異，掌握未來 24 小時變化';
+      }else{
+        suggestion = '持續觀察是否有增強跡象並留意環流發展';
+      }
+      return `目前強度位於「${title}」，${suggestion}，${tail}`;
     }
 
     function showDetailPanel(info){
@@ -219,7 +234,14 @@
         }
       }
       if(detailPressure) detailPressure.textContent = info.pressure || '—';
-      if(detailTrend) detailTrend.textContent = info.trend || '—';
+      const applyGrade=(el,value,color)=>{ if(!el) return; el.textContent=value || '—'; if(color){ el.style.color=color; } else { el.style.removeProperty('color'); } };
+      applyGrade(detailPrevGrade, info.prev?.grade, info.prev?.color);
+      applyGrade(detailCurrentGrade, info.gradeLabel, info.intensityColor);
+      applyGrade(detailNextGrade, info.next?.grade, info.next?.color);
+      if(detailTrend){
+        const trendText = info.trend && info.trend !== '—' ? info.trend : '暫無足夠資訊，建議檢視相鄰節點。';
+        detailTrend.textContent = `趨勢摘要｜${trendText}`;
+      }
 
       if(detailPrevBtn) detailPrevBtn.disabled = !info.prevId;
       if(detailNextBtn) detailNextBtn.disabled = !info.nextId;
@@ -231,7 +253,10 @@
       if(detailNextTime) detailNextTime.textContent = info.next?.timeTw || '—';
       if(detailNextWind) detailNextWind.textContent = info.next?.windSummary || '—';
 
-      if(detailFooter) detailFooter.textContent = info.footer || '—';
+      if(detailFooter){
+        const footerText = info.footer && info.footer !== '—' ? info.footer : '暫無進一步建議，請查看其他節點。';
+        detailFooter.textContent = `下一步建議｜${footerText}`;
+      }
       setActiveSystem(info.systemKey || null);
     }
 
@@ -263,6 +288,21 @@
       const t = new Date().toLocaleString('zh-TW',{hour12:false});
       historyLogEl.textContent += `[${t}] ${msg}\n`;
       historyLogEl.scrollTop = historyLogEl.scrollHeight;
+    }
+
+    if(themeController){
+      document.addEventListener('cyclone-theme-change', event=>{
+        const previous = currentTheme;
+        if(event && event.detail && event.detail.theme){
+          currentTheme = event.detail.theme;
+        } else {
+          currentTheme = themeController.current || currentTheme;
+        }
+        buildTsChart();
+        if(previous && previous !== currentTheme){
+          logOp(`版面主題切換：${currentTheme==='day'?'白天':'夜間'}`);
+        }
+      });
     }
 
     const collapsiblePanels = document.querySelectorAll('#sidebar .panel');
@@ -446,6 +486,14 @@
       return '強烈颱風（≥51 m/s）';
     }
 
+    function gradeLabelForPreferredUnit(kt){
+      if(preferredUnit==='ms'){
+        const ms = (kt!=null && isFinite(kt)) ? toMsFromKt(kt) : null;
+        return classifyMS(ms);
+      }
+      return classifyKT(kt);
+    }
+
     function withAlpha(hex, alpha){
       if(!hex || typeof hex!=='string') return '';
       const clean = hex.replace('#','');
@@ -584,6 +632,8 @@
         timeUtc: point.valid_time,
         windSummary: windSummary(kt),
         kt,
+        grade: gradeLabelForPreferredUnit(kt),
+        color: colorByKT6(kt),
         lat: (point.lat!=null && isFinite(point.lat)) ? +point.lat : null,
         lon: (point.lon!=null && isFinite(point.lon)) ? +point.lon : null
       };
@@ -601,10 +651,12 @@
       const prevInfo = buildSiblingInfo(prevId);
       const nextInfo = buildSiblingInfo(nextId);
       const intensityColor = colorByKT6(kt);
+      const gradeLabel = gradeLabelForPreferredUnit(kt);
       const trendInsight = computeTrend(prevInfo, currentEntry, nextInfo);
       const cautionParts = [];
+      const gradeMessage = footerByWind(kt);
+      if(gradeMessage) cautionParts.push(gradeMessage);
       if(trendInsight.advisory) cautionParts.push(trendInsight.advisory);
-      cautionParts.push(footerByWind(kt));
       const info = {
         nodeId,
         prevId: prevId || '',
@@ -621,13 +673,14 @@
         windSummary: windSummary(kt),
         ktClass: classifyKT(kt),
         msClass: classifyMS(kt!=null?toMsFromKt(kt):null),
+        gradeLabel,
         pressure: (point.mslp!=null && !isNaN(point.mslp)) ? `${(+point.mslp).toFixed(1)} hPa` : '—',
-        footer: cautionParts.join(' ').trim(),
+        footer: cautionParts.filter(Boolean).join(' ').trim(),
         intensityColor
       };
       info.prev = prevInfo;
       info.next = nextInfo;
-      info.trend = trendInsight.summary || '—';
+      info.trend = trendInsight.summary || '';
       showDetailPanel(info);
       if(shouldLog){ logOp(`檢視節點詳細：${label} sample ${sample} @ ${info.timeTw}`); }
     }
@@ -1290,31 +1343,6 @@
     }
 
     // ====== 分享（狀態） ======
-    function applyTheme(theme, {persist=true}={}){
-      currentTheme = (theme==='day') ? 'day' : 'night';
-      document.body.classList.remove('theme-mono');
-      document.body.classList.toggle('theme-day', currentTheme==='day');
-      if(themeToggle){
-        themeToggle.textContent = currentTheme==='day' ? '🌙 夜間模式' : '☀️ 白天模式';
-        themeToggle.setAttribute('aria-pressed', currentTheme==='day' ? 'true' : 'false');
-        themeToggle.title = currentTheme==='day' ? '切換為夜間模式' : '切換為白天模式';
-      }
-      if(persist){
-        try{ localStorage.setItem(THEME_STORAGE_KEY, currentTheme); }catch{}
-      }
-      buildTsChart();
-    }
-
-    applyTheme(currentTheme, {persist:false});
-
-    if(themeToggle){
-      themeToggle.addEventListener('click', ()=>{
-        const next = currentTheme==='day' ? 'night' : 'day';
-        applyTheme(next);
-        logOp(`版面主題切換：${next==='day'?'白天':'夜間'}`);
-      });
-    }
-
     function serializeState(){
       const c = map.getCenter(), z = map.getZoom();
       const sysVis = {}; systemLayers.forEach((e,k)=>{ sysVis[k]=!!e.visible; });
@@ -1439,22 +1467,24 @@
     document.addEventListener('keydown', handleShortcut);
 
     // ====== Collapse sidebar（同步 legend 位置） ======
-    btnCollapse.addEventListener('click', ()=>{
-      if(app.classList.contains('collapsed')){
-        app.classList.remove('collapsed');
-        rootStyle.setProperty('--sidebar-w','440px');
-        btnCollapse.textContent='隱藏資料面板';
-        btnCollapse.setAttribute('aria-expanded','true');
-        logOp('展開資料面板');
-      }else{
-        app.classList.add('collapsed');
-        rootStyle.setProperty('--sidebar-w','0px');
-        btnCollapse.textContent='顯示資料面板';
-        btnCollapse.setAttribute('aria-expanded','false');
-        logOp('收合資料面板');
-      }
-      setTimeout(()=>{ try{ map.invalidateSize(); }catch{} }, 320);
-    });
+    if(btnCollapse){
+      btnCollapse.addEventListener('click', ()=>{
+        if(app.classList.contains('collapsed')){
+          app.classList.remove('collapsed');
+          rootStyle.setProperty('--sidebar-w','440px');
+          btnCollapse.textContent='⤢ 隱藏資料面板';
+          btnCollapse.setAttribute('aria-expanded','true');
+          logOp('展開資料面板');
+        }else{
+          app.classList.add('collapsed');
+          rootStyle.setProperty('--sidebar-w','0px');
+          btnCollapse.textContent='🗂️ 顯示資料面板';
+          btnCollapse.setAttribute('aria-expanded','false');
+          logOp('收合資料面板');
+        }
+        setTimeout(()=>{ try{ map.invalidateSize(); }catch{} }, 320);
+      });
+    }
 
     // ====== File UI ======
     document.getElementById('csvFiles').addEventListener('change', (e)=>{
