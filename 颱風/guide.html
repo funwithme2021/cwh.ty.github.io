@@ -41,7 +41,7 @@
       <ol style="margin:0;padding-left:22px;color:var(--muted);line-height:1.8;">
         <li><strong style="color:var(--heading);">選擇資料來源：</strong>在「線上資料」區選擇模型與 UTC 循環，或直接匯入一至多個 CSV。系統會自動清理欄位並辨識 track_id。</li>
         <li><strong style="color:var(--heading);">瀏覽地圖與圖層：</strong>左側面板可切換路線圖與機率熱度圖、決定性顏色、節點與風圈顯示。多個系統會自動分色。</li>
-        <li><strong style="color:var(--heading);">解析節點：</strong>點選地圖節點或列表即可在右側「節點詳情」面板看到時間、位置、風速換算與分級提示。</li>
+        <li><strong style="color:var(--heading);">解析節點：</strong>點選地圖節點或列表即可在右側「節點詳情」面板看到時間、位置、風速換算與分級提示，並可比對前後時刻的強度趨勢與建議行動。</li>
         <li><strong style="color:var(--heading);">分享成果：</strong>使用浮動工具列或頁面頂端的分享按鈕，將目前視圖轉成可複製的 URL，讓他人一鍵還原你的設定。</li>
       </ol>
     </section>
@@ -59,9 +59,21 @@
         </div>
         <div class="status muted">
           <strong style="color:var(--heading);display:block;margin-bottom:6px;">時間 × 強度圖</strong>
-          <span>支援決定性與所有系集成員模式。滑鼠移動可顯示詳細資訊，並同步反映單位切換。</span>
+          <span>支援決定性與所有系集成員模式。滑鼠移動可顯示詳細資訊，並同步反映單位切換與地圖配色。</span>
         </div>
       </div>
+    </section>
+
+    <section class="panel" style="display:grid; gap:18px;">
+      <h2 style="margin:0;color:var(--heading);font-size:20px;">快捷鍵與介面技巧</h2>
+      <ul class="shortcut-list">
+        <li><kbd>Shift</kbd> + <kbd>C</kbd>：收合或展開資料面板，地圖會即時擴充至全螢幕。</li>
+        <li><kbd>Shift</kbd> + <kbd>M</kbd>：在路線圖與機率熱度圖之間切換。</li>
+        <li><kbd>Shift</kbd> + <kbd>U</kbd>：循環切換 kt／m/s／km/h，圖例與節點詳情同步更新。</li>
+        <li><kbd>Shift</kbd> + <kbd>F</kbd>：聚焦系統搜尋欄，便於快速篩選資料。</li>
+        <li><kbd>Shift</kbd> + <kbd>Arrow&nbsp;← / →</kbd>：在節點詳情面板檢視上一筆或下一筆資料。</li>
+      </ul>
+      <p class="note">行動裝置可透過長按節點開啟詳情卡片，並可橫向滑動時間軸比較前後變化。</p>
     </section>
 
     <section id="faq" class="panel" style="display:grid; gap:18px;">
