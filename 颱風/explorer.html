@@ -24,7 +24,7 @@
         <a href="guide.html">使用指南</a>
       </nav>
       <div class="header-actions">
-        <button class="btn ghost sm" id="themeToggle" type="button" aria-pressed="false">☀️ 白天模式</button>
+        <button class="btn ghost sm" id="themeToggle" data-theme-toggle type="button" aria-pressed="false">☀️ 白天模式</button>
         <a class="ghost-link" href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener">WeatherLab 官方</a>
       </div>
     </div>
@@ -37,7 +37,6 @@
         <p>即時整合 DeepMind WeatherLab 以及自備 CSV，使用互動式地圖掌握熱帶氣旋的路徑、強度與風圈，並透過時間 × 強度視覺化與歷史紀錄讓決策更直覺。</p>
       </div>
       <div class="intro-actions">
-        <button class="btn" id="btnCollapse">隱藏資料面板</button>
         <button class="btn outline" id="btnShareTop">分享目前視圖</button>
       </div>
     </section>
@@ -183,21 +182,24 @@
         </div>
       </aside>
       <section class="workspace" aria-label="互動視圖">
+        <div class="workspace-toolbar">
+          <button class="btn highlight" id="btnCollapse" type="button" aria-expanded="true">⤢ 隱藏資料面板</button>
+        </div>
         <div class="workspace-grid">
           <div class="map-column">
             <div class="map-container">
               <div class="map-frame">
                 <div id="map"></div>
-                <div class="legend" id="legend" aria-live="polite">
-                  <div class="legend-scale">
-                    <div class="scale-bar" id="legendGradient"></div>
-                    <div class="scale-labels" id="legendStops"></div>
-                  </div>
-                  <div class="legend-list" id="legendText"></div>
-                  <div class="tools">
-                    <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
-                    <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
-                  </div>
+              </div>
+              <div class="legend" id="legend" aria-live="polite">
+                <div class="legend-scale">
+                  <div class="scale-bar" id="legendGradient"></div>
+                  <div class="scale-labels" id="legendStops"></div>
+                </div>
+                <div class="legend-list" id="legendText"></div>
+                <div class="tools">
+                  <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
+                  <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
                 </div>
               </div>
             </div>
@@ -263,20 +265,26 @@
                   <div class="timeline-title">上一時刻</div>
                   <div class="timeline-time" id="detailPrevTime">—</div>
                   <div class="timeline-wind" id="detailPrevWind">—</div>
+                  <div class="timeline-grade" id="detailPrevGrade">—</div>
                 </div>
                 <div class="timeline-card current">
                   <div class="timeline-title">目前節點</div>
                   <div class="timeline-time" id="detailCurrentTime">—</div>
                   <div class="timeline-wind" id="detailCurrentWind">—</div>
-                  <div class="timeline-trend" id="detailTrend">—</div>
+                  <div class="timeline-grade" id="detailCurrentGrade">—</div>
                 </div>
                 <div class="timeline-card" id="detailNextCard">
                   <div class="timeline-title">下一時刻</div>
                   <div class="timeline-time" id="detailNextTime">—</div>
                   <div class="timeline-wind" id="detailNextWind">—</div>
+                  <div class="timeline-grade" id="detailNextGrade">—</div>
                 </div>
               </div>
-              <div class="detail-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
+              <div class="detail-insights">
+                <div class="insight-label">🧠 智能摘要</div>
+                <p class="insight-line" id="detailTrend">趨勢摘要｜暫無資訊，請先在地圖上選擇節點。</p>
+                <p class="insight-line" id="detailFooter">下一步建議｜點選節點後，這裡會提供風險提示與建議操作。</p>
+              </div>
             </div>
           </aside>
         </div>
@@ -300,6 +308,7 @@
     </div>
   </footer>
 
+  <script src="assets/js/theme.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
 </html>
