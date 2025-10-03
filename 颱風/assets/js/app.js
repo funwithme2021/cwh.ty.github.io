@@ -1,6 +1,25 @@
 (()=>{
 // ====== 基本狀態 ======
-    let preferredUnit = 'kt'; // 'kt' | 'ms' | 'kmh'
+    function parseStateFromHash(){
+      const hash = location.hash || '';
+      const match = hash.match(/s=([^&]+)/);
+      if(!match) return null;
+      try{
+        const obj = JSON.parse(decodeURIComponent(atob(match[1])));
+        return (obj && typeof obj==='object') ? obj : null;
+      }catch(err){
+        console.warn('無法解析分享狀態，將使用預設值', err);
+        return null;
+      }
+    }
+
+    const initialState = parseStateFromHash();
+    let restoreState = initialState;
+    const initialBaseName = (initialState && typeof initialState.b==='string') ? initialState.b : null;
+    const initialCenter = Array.isArray(initialState?.c) ? initialState.c : null;
+    const initialZoom = (initialState && typeof initialState.z==='number') ? initialState.z : null;
+
+    let preferredUnit = (initialState && ['kt','ms','kmh'].includes(initialState.u)) ? initialState.u : 'kt'; // 'kt' | 'ms' | 'kmh'
     const KT_TO_MS = 0.514444, KT_TO_KMH = 1.852;
     const tz = 'Asia/Taipei';
 
@@ -18,6 +37,7 @@
     const rootStyle = document.documentElement.style;
     const app=document.getElementById('app');
     const btnCollapse=document.getElementById('btnCollapse');
+    if(btnCollapse) btnCollapse.setAttribute('aria-expanded','true');
     const systemsDiv=document.getElementById('systems');
 
     const toggleDet=document.getElementById('toggleDet');
@@ -43,6 +63,11 @@
     const systemSummary=document.getElementById('systemSummary');
     const systemFilter=document.getElementById('systemFilter');
     const systemEntryMap=new Map();
+    let activeSystemKey=null;
+    const nodeStore=new Map();
+
+    const legendGradient=document.getElementById('legendGradient');
+    const legendStops=document.getElementById('legendStops');
 
     const detailPanel=document.getElementById('detailPanel');
     const detailTitle=document.getElementById('detailTitle');
@@ -53,6 +78,18 @@
     const detailTimeUtc=document.getElementById('detailTimeUtc');
     const detailLocation=document.getElementById('detailLocation');
     const detailWind=document.getElementById('detailWind');
+    const detailWindPrimary=document.getElementById('detailWindPrimary');
+    const detailCurrentTime=document.getElementById('detailCurrentTime');
+    const detailCurrentWind=document.getElementById('detailCurrentWind');
+    const detailPrevTime=document.getElementById('detailPrevTime');
+    const detailPrevWind=document.getElementById('detailPrevWind');
+    const detailNextTime=document.getElementById('detailNextTime');
+    const detailNextWind=document.getElementById('detailNextWind');
+    const detailTrend=document.getElementById('detailTrend');
+    const detailPrevBtn=document.getElementById('detailPrevBtn');
+    const detailNextBtn=document.getElementById('detailNextBtn');
+    const detailPrevCard=document.getElementById('detailPrevCard');
+    const detailNextCard=document.getElementById('detailNextCard');
     const detailKtClass=document.getElementById('detailKtClass');
     const detailMsClass=document.getElementById('detailMsClass');
     const detailPressure=document.getElementById('detailPressure');
@@ -62,13 +99,33 @@
     const toastEl=document.getElementById('toast');
     function showToast(msg){ toastEl.textContent=msg; toastEl.style.display='block'; setTimeout(()=>toastEl.style.display='none', 1600); }
 
+    function setActiveSystem(key){
+      if(activeSystemKey && systemEntryMap.has(activeSystemKey)){
+        systemEntryMap.get(activeSystemKey).classList.remove('active');
+      }
+      activeSystemKey = key || null;
+      if(activeSystemKey && systemEntryMap.has(activeSystemKey)){
+        const row = systemEntryMap.get(activeSystemKey);
+        row.classList.add('active');
+        try{ row.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch{}
+      }
+    }
+
     function resetDetailPanel(){
       if(!detailPanel) return;
       detailPanel.classList.add('hidden');
+      detailPanel.dataset.node='';
+      detailPanel.dataset.prev='';
+      detailPanel.dataset.next='';
       if(detailTitle) detailTitle.textContent='點選節點以檢視詳細資料';
       if(detailSubtitle) detailSubtitle.textContent='同時支援決定性與系集成員。';
-      [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailKtClass, detailMsClass, detailPressure].forEach(el=>{ if(el) el.textContent='—'; });
+      [detailSystem, detailMember, detailTimeTw, detailTimeUtc, detailLocation, detailWind, detailWindPrimary, detailCurrentTime, detailCurrentWind, detailPrevTime, detailPrevWind, detailNextTime, detailNextWind, detailKtClass, detailMsClass, detailPressure, detailTrend].forEach(el=>{ if(el) el.textContent='—'; });
+      if(detailPrevBtn) detailPrevBtn.disabled=true;
+      if(detailNextBtn) detailNextBtn.disabled=true;
+      if(detailPrevCard) detailPrevCard.classList.add('inactive');
+      if(detailNextCard) detailNextCard.classList.add('inactive');
       if(detailFooter) detailFooter.textContent='選擇節點後顯示更多提示與建議操作。';
+      setActiveSystem(null);
     }
 
     function footerByWind(kt){
@@ -83,6 +140,10 @@
     function showDetailPanel(info){
       if(!detailPanel || !info) return;
       detailPanel.classList.remove('hidden');
+      detailPanel.dataset.node = info.nodeId || '';
+      detailPanel.dataset.prev = info.prevId || '';
+      detailPanel.dataset.next = info.nextId || '';
+
       if(detailTitle) detailTitle.textContent = info.title || '節點資訊';
       if(detailSubtitle) detailSubtitle.textContent = info.subtitle || '';
       if(detailSystem) detailSystem.textContent = info.system || '—';
@@ -90,14 +151,36 @@
       if(detailTimeTw) detailTimeTw.textContent = info.timeTw || '—';
       if(detailTimeUtc) detailTimeUtc.textContent = info.timeUtc || '—';
       if(detailLocation) detailLocation.textContent = info.location || '—';
-      if(detailWind) detailWind.textContent = info.wind || '—';
+      if(detailWindPrimary) detailWindPrimary.textContent = info.windPrimary || '—';
+      if(detailWind) detailWind.textContent = info.windSummary || '—';
+      if(detailCurrentTime) detailCurrentTime.textContent = info.timeTw || '—';
+      if(detailCurrentWind) detailCurrentWind.textContent = info.windSummary || '—';
       if(detailKtClass) detailKtClass.textContent = info.ktClass || '—';
       if(detailMsClass) detailMsClass.textContent = info.msClass || '—';
       if(detailPressure) detailPressure.textContent = info.pressure || '—';
+      if(detailTrend) detailTrend.textContent = info.trend || '—';
+
+      if(detailPrevBtn) detailPrevBtn.disabled = !info.prevId;
+      if(detailNextBtn) detailNextBtn.disabled = !info.nextId;
+      if(detailPrevCard) detailPrevCard.classList.toggle('inactive', !info.prevId);
+      if(detailNextCard) detailNextCard.classList.toggle('inactive', !info.nextId);
+
+      if(detailPrevTime) detailPrevTime.textContent = info.prev?.timeTw || '—';
+      if(detailPrevWind) detailPrevWind.textContent = info.prev?.windSummary || '—';
+      if(detailNextTime) detailNextTime.textContent = info.next?.timeTw || '—';
+      if(detailNextWind) detailNextWind.textContent = info.next?.windSummary || '—';
+
       if(detailFooter) detailFooter.textContent = info.footer || '—';
+      setActiveSystem(info.systemKey || null);
     }
 
     if(detailClose) detailClose.addEventListener('click', ()=>{ resetDetailPanel(); logOp('關閉節點詳細面板'); });
+    if(detailPrevBtn) detailPrevBtn.addEventListener('click', ()=>{
+      if(detailPanel){ const target=detailPanel.dataset.prev; if(target) openNode(target); }
+    });
+    if(detailNextBtn) detailNextBtn.addEventListener('click', ()=>{
+      if(detailPanel){ const target=detailPanel.dataset.next; if(target) openNode(target); }
+    });
     resetDetailPanel();
 
     // Online loader refs
@@ -124,8 +207,21 @@
     // App state
     const systemLayers=new Map(); // key -> {group, det:[], ens:[], color, visible:true, label}
     let allRows=[]; let heatLayer=null;
-    let showTracks=true; let allDetVisible=true, allEnsVisible=true, showPts=true, showRadii=true;
-    let detUseBlack=true;
+    let showTracks = initialState ? (initialState.md!==1) : true;
+    let allDetVisible = initialState ? (initialState.det!==0) : true;
+    let allEnsVisible = initialState ? (initialState.ens!==0) : true;
+    let showPts = initialState ? (initialState.pts!==0) : true;
+    let showRadii = initialState ? (initialState.rad!==0) : true;
+    let detUseBlack = initialState ? (initialState.dm!==0) : true;
+
+    if(toggleDet) toggleDet.checked = allDetVisible;
+    if(toggleEns) toggleEns.checked = allEnsVisible;
+    if(togglePts) togglePts.checked = showPts;
+    if(toggleRadii) toggleRadii.checked = showRadii;
+    if(modeTracks) modeTracks.dataset.active = showTracks ? 'true' : 'false';
+    if(modeProb) modeProb.dataset.active = showTracks ? 'false' : 'true';
+    if(detBlack) detBlack.dataset.active = detUseBlack ? 'true' : 'false';
+    if(detIntensity) detIntensity.dataset.active = detUseBlack ? 'false' : 'true';
 
     function updateSystemSummary(){
       if(!systemSummary) return;
@@ -156,6 +252,23 @@
     // ====== Helpers ======
     function toMsFromKt(kt){ return kt*KT_TO_MS; }
     function toKmhFromKt(kt){ return kt*KT_TO_KMH; }
+
+    function formatFixed(value, decimals){
+      if(value==null || !isFinite(value)) return '—';
+      return Number(value).toFixed(decimals).replace(/\.0+$/,'').replace(/(\.\d*[1-9])0+$/,'$1');
+    }
+
+    function formatPrimaryWind(kt){
+      if(kt==null || !isFinite(kt)) return '—';
+      if(preferredUnit==='ms') return `${formatFixed(toMsFromKt(kt), 2)} m/s`;
+      if(preferredUnit==='kmh') return `${formatFixed(toKmhFromKt(kt), 1)} km/h`;
+      return `${formatFixed(kt, 0)} kt`;
+    }
+
+    function windSummary(kt){
+      if(kt==null || !isFinite(kt)) return '—';
+      return `${formatFixed(kt,0)} kt ｜ ${formatFixed(toMsFromKt(kt),2)} m/s ｜ ${formatFixed(toKmhFromKt(kt),1)} km/h`;
+    }
 
     function toUTCDate(s){
       if(!s) return new Date(NaN);
@@ -242,6 +355,74 @@
       if(ms<=50.99) return '中度颱風（32.7–50.9 m/s）';
       return '強烈颱風（≥51 m/s）';
     }
+
+    function computeTrend(prevEntry, currentEntry){
+      if(!prevEntry || !currentEntry) return '—';
+      const prevKt = prevEntry.kt;
+      const curKt = currentEntry.kt;
+      if(prevKt==null || curKt==null || !isFinite(prevKt) || !isFinite(curKt)) return '—';
+      const unitDelta = unitValueFromKt(curKt) - unitValueFromKt(prevKt);
+      const ktDelta = curKt - prevKt;
+      const prevDate = toUTCDate(prevEntry.timeUtc);
+      const curDate = toUTCDate(currentEntry.timeUtc);
+      const hourDelta = (curDate - prevDate) / 36e5;
+      const decimals = preferredUnit==='kt' ? 0 : (preferredUnit==='ms' ? 2 : 1);
+      const unitDeltaStr = `${unitDelta>=0?'+':''}${formatFixed(unitDelta, decimals)} ${unitLabel()}`;
+      const ktDeltaStr = `${ktDelta>=0?'+':''}${formatFixed(ktDelta,0)} kt`;
+      const hoursStr = isFinite(hourDelta) ? `｜Δ${formatFixed(Math.abs(hourDelta), hourDelta%1?1:0)}h` : '';
+      return `${unitDeltaStr}（${ktDeltaStr}${hoursStr}）`;
+    }
+
+    function buildSiblingInfo(nodeId){
+      if(!nodeId) return null;
+      const node = nodeStore.get(nodeId);
+      if(!node) return null;
+      const kt = (node.point.wind!=null && isFinite(node.point.wind)) ? +node.point.wind : null;
+      return {
+        nodeId,
+        timeTw: fmtTaiwan(node.point.valid_time),
+        timeUtc: node.point.valid_time,
+        windSummary: windSummary(kt),
+        kt
+      };
+    }
+
+    function openNode(nodeId, shouldLog=true){
+      const node = nodeStore.get(nodeId);
+      if(!node) return;
+      const {key, label, sample, isDet, point, prevId, nextId} = node;
+      const kt = (point.wind!=null && isFinite(point.wind)) ? +point.wind : null;
+      const info = {
+        nodeId,
+        prevId: prevId || '',
+        nextId: nextId || '',
+        title: label,
+        subtitle: isDet ? '決定性路徑節點' : `系集成員 sample ${sample}`,
+        system: label,
+        systemKey: key,
+        member: String(sample),
+        timeTw: fmtTaiwan(point.valid_time),
+        timeUtc: point.valid_time,
+        location: `${(+point.lat).toFixed(2)}, ${(+point.lon).toFixed(2)}`,
+        windPrimary: formatPrimaryWind(kt),
+        windSummary: windSummary(kt),
+        ktClass: classifyKT(kt),
+        msClass: classifyMS(kt!=null?toMsFromKt(kt):null),
+        pressure: (point.mslp!=null && !isNaN(point.mslp)) ? `${(+point.mslp).toFixed(1)} hPa` : '—',
+        footer: footerByWind(kt)
+      };
+      info.prev = buildSiblingInfo(prevId);
+      info.next = buildSiblingInfo(nextId);
+      info.trend = computeTrend(info.prev, {kt, timeUtc: point.valid_time});
+      showDetailPanel(info);
+      if(shouldLog){ logOp(`檢視節點詳細：${label} sample ${sample} @ ${info.timeTw}`); }
+    }
+
+    function refreshDetailForUnit(){
+      if(!detailPanel || detailPanel.classList.contains('hidden')) return;
+      const nodeId = detailPanel.dataset.node;
+      if(nodeId) openNode(nodeId, false);
+    }
     function colorDynamic(kt){
       if(preferredUnit==='ms'){
         const ms = (kt!=null && isFinite(kt)) ? toMsFromKt(kt) : null;
@@ -251,6 +432,12 @@
       } else {
         return colorByKT6(kt);
       }
+    }
+    function gradientFromColors(colors){
+      if(!colors || !colors.length) return '';
+      if(colors.length===1) return colors[0];
+      const step = 100/(colors.length-1);
+      return `linear-gradient(90deg, ${colors.map((c,i)=>`${c} ${(i*step).toFixed(1)}%`).join(', ')})`;
     }
     function unitValueFromKt(kt){
       if(kt==null || !isFinite(kt)) return null;
@@ -262,36 +449,52 @@
 
     // ====== Legend ======
     function updateLegend(){
-      document.getElementById('unitToggle').textContent = '單位：' + preferredUnit;
+      if(unitToggle) unitToggle.textContent = '單位：' + preferredUnit;
       const el = document.getElementById('legendText');
+      if(!el) return;
+      let segments=[];
+      let colors=[];
+      let stops=[];
       if(preferredUnit==='ms'){
-        el.innerHTML = `強度（<b>m/s</b> ）：
-          <span class="item"><span class="dot" style="background:${C_GRAY}"></span>熱帶擾動/低壓</span>
-          <span class="item"><span class="dot" style="background:${C_BLUE}"></span>熱帶性低氣壓</span>
-          <span class="item"><span class="dot" style="background:${C_TEAL}"></span>輕度颱風</span>
-          <span class="item"><span class="dot" style="background:${C_ORANGE}"></span>中度颱風</span>
-          <span class="item"><span class="dot" style="background:${C_RED}"></span>強烈颱風</span>`;
+        segments = [
+          {color:C_GRAY, label:'熱帶擾動/低壓 ≤11.3'},
+          {color:C_BLUE, label:'熱帶性低氣壓 11.4–17.1'},
+          {color:C_TEAL, label:'輕度颱風 17.2–32.6'},
+          {color:C_ORANGE, label:'中度颱風 32.7–50.9'},
+          {color:C_RED, label:'強烈颱風 ≥51'}
+        ];
+        colors = segments.map(s=>s.color);
+        stops = ['0','11.3','17.2','32.7','≥51'];
       } else if(preferredUnit==='kmh'){
-        el.innerHTML = `強度（<b>km/h</b> ）：
-          <span class="item"><span class="dot" style="background:${C_GRAY}"></span>&lt;41</span>
-          <span class="item"><span class="dot" style="background:${C_BLUE}"></span>&lt;41-55</span>
-          <span class="item"><span class="dot" style="background:${C_TEAL}"></span>56–117</span>
-          <span class="item"><span class="dot" style="background:${C_YELLOW}"></span>118–152</span>
-          <span class="item"><span class="dot" style="background:${C_ORANGE}"></span>153–176</span>
-          <span class="item"><span class="dot" style="background:${C_DEEPOR}"></span>178–209</span>
-          <span class="item"><span class="dot" style="background:${C_RED}"></span>210–247</span>
-          <span class="item"><span class="dot" style="background:#d50000"></span>248–289</span>
-          <span class="item"><span class="dot" style="background:${C_PURPLE}"></span>≥291</span>`;
+        segments = [
+          {color:C_GRAY, label:'<41 km/h'},
+          {color:C_BLUE, label:'41–55 km/h'},
+          {color:C_TEAL, label:'56–117 km/h'},
+          {color:C_YELLOW, label:'118–152 km/h'},
+          {color:C_ORANGE, label:'153–176 km/h'},
+          {color:C_DEEPOR, label:'178–209 km/h'},
+          {color:C_RED, label:'210–247 km/h'},
+          {color:'#d50000', label:'248–289 km/h'},
+          {color:C_PURPLE, label:'≥291 km/h'}
+        ];
+        colors = segments.map(s=>s.color);
+        stops = ['0','41','56','118','153','178','210','248','≥291'];
       } else {
-        el.innerHTML = `強度（<b>kt</b> ）：
-          <span class="item"><span class="dot" style="background:${C_GRAY}"></span>熱帶性低氣壓/擾動</span>
-          <span class="item"><span class="dot" style="background:${C_BLUE}"></span>熱帶風暴</span>
-          <span class="item"><span class="dot" style="background:${C_TEAL}"></span>一級</span>
-          <span class="item"><span class="dot" style="background:${C_YELLOW}"></span>二級</span>
-          <span class="item"><span class="dot" style="background:${C_ORANGE}"></span>三級</span>
-          <span class="item"><span class="dot" style="background:${C_RED}"></span>四級</span>
-          <span class="item"><span class="dot" style="background:${C_PURPLE}"></span>五級</span>`;
+        segments = [
+          {color:C_GRAY, label:'熱帶低氣壓/擾動 <34 kt'},
+          {color:C_BLUE, label:'熱帶風暴 34–63 kt'},
+          {color:C_TEAL, label:'一級颱風 64–82 kt'},
+          {color:C_YELLOW, label:'二級颱風 83–95 kt'},
+          {color:C_ORANGE, label:'三級颱風 96–113 kt'},
+          {color:C_RED, label:'四級颱風 114–135 kt'},
+          {color:C_PURPLE, label:'五級颱風 ≥136 kt'}
+        ];
+        colors = segments.map(s=>s.color);
+        stops = ['0','34','64','83','96','114','≥136'];
       }
+      el.innerHTML = segments.map(seg=>`<span class="item"><span class="dot" style="background:${seg.color}"></span>${seg.label}</span>`).join('');
+      if(legendGradient) legendGradient.style.background = gradientFromColors(colors);
+      if(legendStops) legendStops.innerHTML = stops.map(s=>`<span>${s}</span>`).join('');
     }
     function cycleUnit(){
       preferredUnit = (preferredUnit==='kt') ? 'ms' : (preferredUnit==='ms' ? 'kmh' : 'kt');
@@ -300,6 +503,7 @@
       buildTsChart();
       updateHashNow();
       logOp(`單位切換為：${preferredUnit}`);
+      refreshDetailForUnit();
     }
 
     // ====== Map ======
@@ -309,6 +513,19 @@
     const basemaps = {"Carto Dark":baseDark, "OSM":baseOSM, "Esri 衛星":baseSat};
     let currentBase = "Carto Dark";
     const map = L.map('map', { zoomControl:true, worldCopyJump:true, layers:[baseDark] }).setView([18,130], 3);
+
+    if(initialBaseName && basemaps[initialBaseName] && initialBaseName!==currentBase){
+      map.addLayer(basemaps[initialBaseName]);
+      map.removeLayer(basemaps[currentBase]);
+      currentBase = initialBaseName;
+    }
+    if(initialCenter && Number.isFinite(+initialCenter[0]) && Number.isFinite(+initialCenter[1])){
+      const lat = +initialCenter[0];
+      const lng = +initialCenter[1];
+      map.setView([lat, lng], initialZoom ?? map.getZoom());
+    }else if(initialZoom!=null && Number.isFinite(initialZoom)){
+      map.setZoom(initialZoom);
+    }
     map.on('click', ()=>{ resetDetailPanel(); });
     L.control.layers(basemaps, null, {position:'topright'}).addTo(map);
     map.createPane('probPane');  map.getPane('probPane').style.zIndex  = 300;
@@ -316,6 +533,7 @@
     map.createPane('radiiPane'); map.getPane('radiiPane').style.zIndex = 700;
     map.createPane('detPane');   map.getPane('detPane').style.zIndex   = 900;
     map.on('baselayerchange', e=>{ currentBase = e.name; updateHashNow(); });
+    window.addEventListener('resize', ()=>{ try{ map.invalidateSize(); }catch{} });
 
     // ====== Build tracks ======
     function buildColoredSegments(latlngs, winds, pane, isDet){
@@ -377,7 +595,9 @@
       ctl.className='toggle';
       const cb=document.createElement('input');
       cb.type='checkbox';
-      cb.checked=true;
+      const visMap = restoreState?.sv;
+      const defaultVisible = !(visMap && Object.prototype.hasOwnProperty.call(visMap, key)) || !!visMap[key];
+      cb.checked = defaultVisible;
       cb.addEventListener('change',()=>{
         const e=systemLayers.get(key);
         e.visible=cb.checked;
@@ -393,6 +613,8 @@
       row.appendChild(ctl);
       systemsDiv.appendChild(row);
       systemEntryMap.set(key, row);
+      const entry=systemLayers.get(key);
+      if(entry){ entry.visible = cb.checked; }
       applySystemFilter();
     }
     function addTrack(key, sample, pts, color, label){
@@ -405,7 +627,7 @@
       const segs = buildColoredSegments(latlngs, winds, pane, isDet);
 
       const markers=[];
-      pts.forEach(p=>{
+      pts.forEach((p, idx)=>{
         const kt = (p.wind!=null? +p.wind : null);
         const ms = (kt!=null? toMsFromKt(kt) : null);
         const kmh= (kt!=null? toKmhFromKt(kt) : null);
@@ -433,23 +655,12 @@
           -分級（kt）：${ktClass}<br>
           -分級（m/s）：${msClass}<br>
           -中心氣壓：${pres}`);
-        m.on('click', ()=>{
-          showDetailPanel({
-            title: label,
-            subtitle: isDet ? '決定性路徑節點' : `系集成員 sample ${sample}`,
-            system: label,
-            member: String(sample),
-            timeTw: twt,
-            timeUtc: utc,
-            location: `${(+p.lat).toFixed(2)}, ${(+p.lon).toFixed(2)}`,
-            wind: bestLine,
-            ktClass,
-            msClass,
-            pressure: pres,
-            footer: footerByWind(kt)
-          });
-          logOp(`檢視節點詳細：${label} sample ${sample} @ ${twt}`);
-        });
+        const nodeId = `${key}|${sample}|${idx}`;
+        const prevId = idx>0 ? `${key}|${sample}|${idx-1}` : null;
+        const nextId = idx<pts.length-1 ? `${key}|${sample}|${idx+1}` : null;
+        nodeStore.set(nodeId, {key, label, sample, isDet, point:p, prevId, nextId});
+        m.__nodeId = nodeId;
+        m.on('click', ()=>{ openNode(nodeId); });
         markers.push(m);
       });
 
@@ -491,6 +702,7 @@
       });
       updateLegend();
       buildTsChart(); // 單位或可見性改變 → 同步重繪圖表
+      refreshDetailForUnit();
     }
     function recolorDeterministic(){
       systemLayers.forEach(entry=>{
@@ -511,6 +723,7 @@
         });
       });
       buildTsChart();
+      refreshDetailForUnit();
     }
     function refreshVisibility(){
       if(showTracks){
@@ -660,6 +873,7 @@
       systemLayers.forEach(e=>map.removeLayer(e.group)); systemLayers.clear();
       if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
       allRows = rows.slice();
+      nodeStore.clear();
       resetDetailPanel();
 
       // group by system -> sample
@@ -705,6 +919,7 @@
       buildTsSystemOptions();
       buildTsChart();
       updateSystemSummary();
+      updateHashNow();
       logOp(`重繪地圖完成：系統 ${systemLayers.size}`);
     }
 
@@ -858,8 +1073,15 @@
       };
     }
     function encodeHash(obj){ return btoa(encodeURIComponent(JSON.stringify(obj))); }
-    function decodeHash(h){ try{ return JSON.parse(decodeURIComponent(atob(h))); }catch(e){ return null; } }
-    function updateHashNow(){ location.hash = 's=' + encodeHash(serializeState()); }
+    function updateHashNow(){
+      const snapshot = serializeState();
+      restoreState = snapshot;
+      location.hash = 's=' + encodeHash(snapshot);
+    }
+    window.addEventListener('hashchange', ()=>{
+      const latest = parseStateFromHash();
+      if(latest){ restoreState = latest; }
+    });
     async function shareView(){
       updateHashNow();
       const url = location.href;
@@ -900,7 +1122,7 @@
     detIntensity.addEventListener('click', ()=>setDetMode(false));
     toggleDet.addEventListener('change', ()=>{ allDetVisible=toggleDet.checked; refreshVisibility(); updateHashNow(); logOp(`顯示決定性：${allDetVisible}`); });
     toggleEns.addEventListener('change', ()=>{ allEnsVisible=toggleEns.checked; refreshVisibility(); updateHashNow(); logOp(`顯示系集：${allEnsVisible}`); });
-    togglePts.addEventListener('change', ()=>{ showPts=togglePts.checked; refreshVisibility(); updateHashNow(); logOp(`顯示節點：${showPts}`); });
+    togglePts.addEventListener('change', ()=>{ showPts=togglePts.checked; refreshVisibility(); if(!showPts) resetDetailPanel(); updateHashNow(); logOp(`顯示節點：${showPts}`); });
     toggleRadii.addEventListener('change', ()=>{ showRadii=toggleRadii.checked; refreshVisibility(); updateHashNow(); logOp(`顯示風圈：${showRadii}`); });
 
     unitToggle.addEventListener('click', cycleUnit);
@@ -916,19 +1138,70 @@
     tsModeEns.addEventListener('click', ()=> setTsMode(false));
     tsSystemSel.addEventListener('change', ()=>{ buildTsChart(); logOp(`時間×強度圖系統切換：${tsSystemSel.value}`); });
 
+    function handleShortcut(e){
+      if(!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const active=document.activeElement;
+      if(active && (active.tagName==='INPUT' || active.tagName==='SELECT' || active.tagName==='TEXTAREA' || active.isContentEditable)) return;
+      const key=e.key.toLowerCase();
+      switch(key){
+        case 'c':
+          if(btnCollapse){ e.preventDefault(); btnCollapse.click(); }
+          break;
+        case 'l':
+          if(btnLatest){ e.preventDefault(); btnLatest.click(); }
+          break;
+        case 's':
+          e.preventDefault();
+          shareView();
+          break;
+        case 'm':
+          e.preventDefault();
+          if(showTracks){ modeProb?.click(); } else { modeTracks?.click(); }
+          break;
+        case 'f':
+          if(systemFilter){
+            e.preventDefault();
+            systemFilter.focus();
+            try{ systemFilter.select(); }catch{}
+            logOp('快捷鍵：聚焦系統搜尋');
+          }
+          break;
+        case 'u':
+          e.preventDefault();
+          cycleUnit();
+          break;
+        case 'arrowleft':
+          if(detailPanel && !detailPanel.classList.contains('hidden')){
+            const prevId = detailPanel.dataset.prev;
+            if(prevId){ e.preventDefault(); openNode(prevId); }
+          }
+          break;
+        case 'arrowright':
+          if(detailPanel && !detailPanel.classList.contains('hidden')){
+            const nextId = detailPanel.dataset.next;
+            if(nextId){ e.preventDefault(); openNode(nextId); }
+          }
+          break;
+      }
+    }
+    document.addEventListener('keydown', handleShortcut);
+
     // ====== Collapse sidebar（同步 legend 位置） ======
     btnCollapse.addEventListener('click', ()=>{
       if(app.classList.contains('collapsed')){
         app.classList.remove('collapsed');
         rootStyle.setProperty('--sidebar-w','440px');
         btnCollapse.textContent='隱藏資料面板';
+        btnCollapse.setAttribute('aria-expanded','true');
         logOp('展開資料面板');
       }else{
         app.classList.add('collapsed');
         rootStyle.setProperty('--sidebar-w','0px');
         btnCollapse.textContent='顯示資料面板';
+        btnCollapse.setAttribute('aria-expanded','false');
         logOp('收合資料面板');
       }
+      setTimeout(()=>{ try{ map.invalidateSize(); }catch{} }, 320);
     });
 
     // ====== File UI ======

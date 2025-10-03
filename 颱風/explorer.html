@@ -42,7 +42,7 @@
     </section>
 
     <div id="app" class="app-grid">
-      <aside id="sidebar">
+      <aside id="sidebar" aria-label="資料操作面板">
         <div class="panel-group">
           <section class="panel">
             <header>
@@ -176,14 +176,36 @@
               <div id="historyLog" class="history"></div>
             </div>
           </section>
+
+          <section class="panel">
+            <header>
+              <div class="panel-title">鍵盤快捷鍵</div>
+              <p class="panel-sub">桌面版最佳化操作</p>
+            </header>
+            <div class="panel-body">
+              <ul class="shortcut-list">
+                <li><kbd>Shift</kbd> + <kbd>C</kbd>：收合／展開資料面板</li>
+                <li><kbd>Shift</kbd> + <kbd>L</kbd>：載入最新可用循環</li>
+                <li><kbd>Shift</kbd> + <kbd>S</kbd>：分享目前視圖</li>
+                <li><kbd>Shift</kbd> + <kbd>M</kbd>：路線圖／機率圖切換</li>
+                <li><kbd>Shift</kbd> + <kbd>F</kbd>：聚焦到系統搜尋欄</li>
+                <li><kbd>Shift</kbd> + <kbd>U</kbd>：切換風速單位</li>
+              </ul>
+              <p class="note">行動裝置會自動隱藏側欄，長按畫面即可開啟節點詳情。</p>
+            </div>
+          </section>
         </div>
       </aside>
 
       <section class="map-area">
         <div class="map-container">
           <div id="map"></div>
-          <div class="legend" id="legend">
-            <div class="bar" id="legendText"></div>
+          <div class="legend" id="legend" aria-live="polite">
+            <div class="legend-scale">
+              <div class="scale-bar" id="legendGradient"></div>
+              <div class="scale-labels" id="legendStops"></div>
+            </div>
+            <div class="legend-list" id="legendText"></div>
             <div class="tools">
               <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
               <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
@@ -195,20 +217,54 @@
                 <h3 id="detailTitle">點選節點以檢視詳細資料</h3>
                 <p id="detailSubtitle">同時支援決定性與系集成員。</p>
               </div>
-              <button class="icon-btn" id="detailClose" aria-label="關閉詳細資訊">×</button>
+              <div class="drawer-controls">
+                <button class="icon-btn" id="detailPrevBtn" aria-label="上一節點" disabled>←</button>
+                <button class="icon-btn" id="detailNextBtn" aria-label="下一節點" disabled>→</button>
+                <button class="icon-btn" id="detailClose" aria-label="關閉詳細資訊">×</button>
+              </div>
             </div>
             <div class="drawer-body">
-              <dl>
-                <div><dt>系統</dt><dd id="detailSystem">—</dd></div>
-                <div><dt>成員</dt><dd id="detailMember">—</dd></div>
-                <div><dt>時間（台灣）</dt><dd id="detailTimeTw">—</dd></div>
-                <div><dt>時間（UTC）</dt><dd id="detailTimeUtc">—</dd></div>
-                <div><dt>位置</dt><dd id="detailLocation">—</dd></div>
-                <div><dt>風速</dt><dd id="detailWind">—</dd></div>
-                <div><dt>分級（kt）</dt><dd id="detailKtClass">—</dd></div>
-                <div><dt>分級（m/s）</dt><dd id="detailMsClass">—</dd></div>
-                <div><dt>中心氣壓</dt><dd id="detailPressure">—</dd></div>
-              </dl>
+              <div class="detail-meta-grid">
+                <div class="meta-item"><span class="meta-label">系統</span><span class="meta-value" id="detailSystem">—</span></div>
+                <div class="meta-item"><span class="meta-label">成員</span><span class="meta-value" id="detailMember">—</span></div>
+                <div class="meta-item"><span class="meta-label">時間（台灣）</span><span class="meta-value" id="detailTimeTw">—</span></div>
+                <div class="meta-item"><span class="meta-label">時間（UTC）</span><span class="meta-value" id="detailTimeUtc">—</span></div>
+                <div class="meta-item"><span class="meta-label">位置</span><span class="meta-value" id="detailLocation">—</span></div>
+                <div class="meta-item"><span class="meta-label">中心氣壓</span><span class="meta-value" id="detailPressure">—</span></div>
+              </div>
+              <div class="detail-metrics">
+                <div class="metric-card">
+                  <span class="metric-label">目前風速</span>
+                  <span class="metric-value" id="detailWindPrimary">—</span>
+                  <span class="metric-sub" id="detailWind">—</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">分級（kt）</span>
+                  <span class="metric-value" id="detailKtClass">—</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">分級（m/s）</span>
+                  <span class="metric-value" id="detailMsClass">—</span>
+                </div>
+              </div>
+              <div class="detail-timeline">
+                <div class="timeline-card" id="detailPrevCard">
+                  <div class="timeline-title">上一時刻</div>
+                  <div class="timeline-time" id="detailPrevTime">—</div>
+                  <div class="timeline-wind" id="detailPrevWind">—</div>
+                </div>
+                <div class="timeline-card current">
+                  <div class="timeline-title">目前節點</div>
+                  <div class="timeline-time" id="detailCurrentTime">—</div>
+                  <div class="timeline-wind" id="detailCurrentWind">—</div>
+                  <div class="timeline-trend" id="detailTrend">—</div>
+                </div>
+                <div class="timeline-card" id="detailNextCard">
+                  <div class="timeline-title">下一時刻</div>
+                  <div class="timeline-time" id="detailNextTime">—</div>
+                  <div class="timeline-wind" id="detailNextWind">—</div>
+                </div>
+              </div>
               <div class="drawer-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
             </div>
           </aside>
