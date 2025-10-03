@@ -123,7 +123,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel" data-default-collapsed="true">
             <header>
               <div class="panel-title">風速換算</div>
             </header>
@@ -168,7 +168,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel" data-default-collapsed="true">
             <header>
               <div class="panel-title">歷史操作與診斷</div>
             </header>
@@ -177,7 +177,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel" data-default-collapsed="true">
             <header>
               <div class="panel-title">鍵盤快捷鍵</div>
               <p class="panel-sub">桌面版最佳化操作</p>
@@ -196,37 +196,65 @@
           </section>
         </div>
       </aside>
-
-      <section class="map-area">
-        <div class="map-container">
-          <div id="map"></div>
-          <div class="legend" id="legend" aria-live="polite">
-            <div class="legend-scale">
-              <div class="scale-bar" id="legendGradient"></div>
-              <div class="scale-labels" id="legendStops"></div>
-            </div>
-            <div class="legend-list" id="legendText"></div>
-            <div class="tools">
-              <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
-              <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
-            </div>
-          </div>
-          <aside class="detail-drawer" id="detailPanel">
-            <div class="drawer-header">
-              <div>
-                <h3 id="detailTitle">點選節點以檢視詳細資料</h3>
-                <p id="detailSubtitle">同時支援決定性與系集成員。</p>
+      <section class="workspace" aria-label="互動視圖">
+        <div class="workspace-grid">
+          <div class="map-column">
+            <div class="map-container">
+              <div class="map-toolbar">
+                <button class="btn ghost" id="themeToggle" title="切換彩色/黑白版面">🌗 黑白版面</button>
               </div>
-              <div class="drawer-controls">
+              <div class="map-frame">
+                <div id="map"></div>
+                <div class="legend" id="legend" aria-live="polite">
+                  <div class="legend-scale">
+                    <div class="scale-bar" id="legendGradient"></div>
+                    <div class="scale-labels" id="legendStops"></div>
+                  </div>
+                  <div class="legend-list" id="legendText"></div>
+                  <div class="tools">
+                    <button class="btn ghost" id="unitToggle" title="切換單位">單位：kt</button>
+                    <button class="btn ghost" id="btnShare" title="產生可分享連結">分享此視圖</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <section class="panel chart-panel" aria-label="時間與強度視圖">
+              <header>
+                <div class="panel-title">時間 × 強度圖</div>
+                <p class="panel-sub">完整寬度顯示，滑鼠移入節點可看細節</p>
+              </header>
+              <div class="panel-body">
+                <div class="chart-controls">
+                  <label class="sr-only" for="tsSystemSel">選擇系統</label>
+                  <select id="tsSystemSel"></select>
+                  <div class="chip-row dense">
+                    <span class="chip" id="tsModeDet" data-active="true">決定性</span>
+                    <span class="chip" id="tsModeEns">所有系集</span>
+                  </div>
+                </div>
+                <div id="tsWrap"><canvas id="tsChart"></canvas></div>
+                <p class="note">拖曳縮放地圖時，圖表會維持選定系統；若節點資訊超出範圍，現在會自動外移避免被裁切。</p>
+              </div>
+            </section>
+          </div>
+          <aside class="detail-panel" id="detailPanel">
+            <header class="detail-header">
+              <div class="detail-heading">
+                <p class="detail-kicker" id="detailSubtitle">同時支援決定性與系集成員。</p>
+                <h3 id="detailTitle">點選節點以檢視詳細資料</h3>
+              </div>
+              <div class="detail-controls">
                 <button class="icon-btn" id="detailPrevBtn" aria-label="上一節點" disabled>←</button>
                 <button class="icon-btn" id="detailNextBtn" aria-label="下一節點" disabled>→</button>
                 <button class="icon-btn" id="detailClose" aria-label="關閉詳細資訊">×</button>
               </div>
-            </div>
-            <div class="drawer-body">
+            </header>
+            <div class="detail-body">
+              <div class="detail-system-badges">
+                <span class="badge" id="detailSystem">—</span>
+                <span class="badge muted" id="detailMember">—</span>
+              </div>
               <div class="detail-meta-grid">
-                <div class="meta-item"><span class="meta-label">系統</span><span class="meta-value" id="detailSystem">—</span></div>
-                <div class="meta-item"><span class="meta-label">成員</span><span class="meta-value" id="detailMember">—</span></div>
                 <div class="meta-item"><span class="meta-label">時間（台灣）</span><span class="meta-value" id="detailTimeTw">—</span></div>
                 <div class="meta-item"><span class="meta-label">時間（UTC）</span><span class="meta-value" id="detailTimeUtc">—</span></div>
                 <div class="meta-item"><span class="meta-label">位置</span><span class="meta-value" id="detailLocation">—</span></div>
@@ -265,7 +293,7 @@
                   <div class="timeline-wind" id="detailNextWind">—</div>
                 </div>
               </div>
-              <div class="drawer-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
+              <div class="detail-footer" id="detailFooter">選擇節點後顯示更多提示與建議操作。</div>
             </div>
           </aside>
         </div>
